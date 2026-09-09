@@ -1,14 +1,15 @@
 import type { ColourState } from '../core/colour-state';
+import { openColourPicker } from './dialogs/colour-picker';
 
 /**
- * Foreground and background swatches. The X and D keyboard shortcuts that go
- * with them live in colour-shortcuts.ts.
+ * Foreground and background swatches. Clicking one opens the full picker; the
+ * X and D keyboard shortcuts live in colour-shortcuts.ts.
  */
 export class ColourSwatches {
   readonly root: HTMLElement;
   private readonly colours: ColourState;
-  private readonly foreground: HTMLInputElement;
-  private readonly background: HTMLInputElement;
+  private readonly foreground: HTMLButtonElement;
+  private readonly background: HTMLButtonElement;
   private readonly detachers: Array<() => void> = [];
 
   constructor(host: HTMLElement, colours: ColourState) {
@@ -20,11 +21,15 @@ export class ColourSwatches {
     this.foreground = this.buildSwatch('Foreground colour', 'pf-swatch--fg');
     this.background = this.buildSwatch('Background colour', 'pf-swatch--bg');
 
-    this.foreground.addEventListener('input', () => {
-      colours.foreground = this.foreground.value;
+    this.foreground.addEventListener('click', () => {
+      openColourPicker(colours.foreground, (hex) => {
+        colours.foreground = hex;
+      });
     });
-    this.background.addEventListener('input', () => {
-      colours.background = this.background.value;
+    this.background.addEventListener('click', () => {
+      openColourPicker(colours.background, (hex) => {
+        colours.background = hex;
+      });
     });
 
     const swap = document.createElement('button');
@@ -55,17 +60,17 @@ export class ColourSwatches {
     this.root.remove();
   }
 
-  private buildSwatch(label: string, modifier: string): HTMLInputElement {
-    const input = document.createElement('input');
-    input.type = 'color';
-    input.className = `pf-swatch ${modifier}`;
-    input.title = label;
-    input.setAttribute('aria-label', label);
-    return input;
+  private buildSwatch(label: string, modifier: string): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `pf-swatch ${modifier}`;
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    return button;
   }
 
   private refresh(): void {
-    this.foreground.value = this.colours.foreground;
-    this.background.value = this.colours.background;
+    this.foreground.style.background = this.colours.foreground;
+    this.background.style.background = this.colours.background;
   }
 }

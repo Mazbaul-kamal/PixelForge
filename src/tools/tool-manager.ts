@@ -290,14 +290,21 @@ export class ToolManager {
         event.preventDefault();
         return;
       }
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-
       const key = event.key === ' ' ? 'space' : event.key.toLowerCase();
 
+      // Overrides are checked before the modifier guard, because Alt is itself
+      // an override key and would otherwise be filtered out as a modifier.
       const overrideTool = this.overrides.get(key);
-      if (overrideTool) {
+      if (overrideTool && !event.ctrlKey && !event.metaKey) {
         // Repeat events fire while the key is held; only the first matters.
-        if (!event.repeat && this.overriddenFrom === null && this.active) {
+        // An interaction in progress is left alone, so Alt cannot break a
+        // brush stroke that is halfway done.
+        if (
+          !event.repeat &&
+          this.overriddenFrom === null &&
+          this.capturedPointerId === null &&
+          this.active
+        ) {
           const from = this.active.id;
           if (this.setActiveTool(overrideTool)) {
             this.overriddenFrom = from;
@@ -307,6 +314,8 @@ export class ToolManager {
         event.preventDefault();
         return;
       }
+
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
 
       // Several tools can share a shortcut; pressing it cycles through them.
       const matches = this.registered.filter((tool) => tool.shortcut.toLowerCase() === key);

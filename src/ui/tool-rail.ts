@@ -30,7 +30,11 @@ const BUCKET_ICON =
 const GRADIENT_ICON =
   '<rect x="3" y="4.5" width="14" height="11"/><path d="M4 14.5 16 5.5" stroke-opacity="0.25"/><path d="M4 11.5 16 5.5" stroke-opacity="0.5"/><path d="M4 8.5 13 5.5" stroke-opacity="0.8"/>';
 
+const EYEDROPPER_ICON =
+  '<path d="M13.6 3.4a2 2 0 0 1 2.9 2.8l-1.3 1.3 1 1-1.4 1.4-1-1-5.4 5.4-2.9.6.6-2.9 5.4-5.4-1-1L11.9 4l1 1z"/>';
+
 const ICONS: Record<string, string> = {
+  eyedropper: EYEDROPPER_ICON,
   gradient: GRADIENT_ICON,
   bucket: BUCKET_ICON,
   'magic-wand': WAND_ICON,

@@ -23,6 +23,7 @@ import { SelectionMask } from './core/selection';
 import { deselect, invertSelection, selectAll, setSelection } from './core/selection-ops';
 import { createLassoTool } from './tools/lasso-tool';
 import { createBucketTool } from './tools/bucket-tool';
+import { createEyedropperTool } from './tools/eyedropper-tool';
 import { createGradientTool } from './tools/gradient-tool';
 import { createMagicWandTool } from './tools/magic-wand-tool';
 import { createMarqueeTool } from './tools/marquee-tool';
@@ -52,6 +53,7 @@ import { attachViewShortcuts } from './ui/view-shortcuts';
 import { UnsavedGuard } from './ui/unsaved-guard';
 import { attachLayerShortcuts } from './ui/layer-shortcuts';
 import { HistoryPanel } from './ui/panels/history-panel';
+import { InfoPanel } from './ui/panels/info-panel';
 import { LayersPanel } from './ui/panels/layers-panel';
 import { attachHistoryShortcuts } from './ui/shortcuts';
 import { StatusBar } from './ui/statusbar';
@@ -106,16 +108,17 @@ function boot(): void {
     if (history.canUndo) doc.pristine = false;
   });
 
+  const notices = new NoticeStack(document.body);
   const thumbnails = new ThumbnailCache(() => doc.layers);
   const layersPanel = new LayersPanel(doc, history, thumbnails, documentChanged);
   const historyPanel = new HistoryPanel(history);
-  shell.panels.append(layersPanel.root, historyPanel.root);
+  const infoPanel = new InfoPanel((message) => notices.show(message));
+  shell.panels.append(layersPanel.root, infoPanel.root, historyPanel.root);
 
   attachHistoryShortcuts(history);
   attachLayerShortcuts(layersPanel);
 
   // ---- files in and out ----
-  const notices = new NoticeStack(document.body);
   const unsavedGuard = new UnsavedGuard(history);
 
   const fileActions = new FileActions({
@@ -274,6 +277,9 @@ function boot(): void {
     },
   });
   toolManager.register(gradientTool);
+  toolManager.register(createEyedropperTool({ onHover: (sample) => infoPanel.show(sample) }));
+  // Alt borrows the eyedropper from any tool and springs back on release.
+  toolManager.registerTemporaryOverride('alt', 'eyedropper');
 
   // Choosing a preset replaces the working gradient.
   toolManager.context.options.subscribe(() => {

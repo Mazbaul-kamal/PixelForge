@@ -196,3 +196,53 @@
 .pf-gradient-controls .pf-range {
   flex: 1;
 }
+
+/* ---- colour picker ---- */
+.pf-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pf-picker-canvases {
+  display: flex;
+  gap: 10px;
+}
+
+.pf-picker-square,
+.pf-picker-strip {
+  border: 1px solid var(--pf-line-strong);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.pf-picker-preview {
+  height: 26px;
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+}
+
+.pf-picker-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pf-picker-recents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pf-picker-recent {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.pf-picker-recent:hover {
+  border-color: var(--pf-accent);
+}

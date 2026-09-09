@@ -140,3 +140,39 @@
   color: var(--pf-text);
   opacity: 1;
 }
+
+/* ---- info readout ---- */
+.pf-info-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pf-info-swatch {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+}
+
+.pf-info-hex {
+  padding: 2px 6px;
+  color: var(--pf-text);
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+  font-family: var(--pf-font-mono);
+  cursor: pointer;
+}
+
+.pf-info-hex:hover {
+  border-color: var(--pf-accent);
+}
+
+.pf-info-row {
+  color: var(--pf-text-dim);
+  font-family: var(--pf-font-mono);
+  font-size: 11px;
+  line-height: 1.7;
+}
