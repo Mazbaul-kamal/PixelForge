@@ -56,6 +56,31 @@ export function addEmptyLayer(doc: PixelDocument, history: History): string | nu
   return createdId;
 }
 
+/**
+ * Copies a layer and inserts the copy directly above it. Records no history,
+ * so a caller such as Alt+drag can fold it into its own transaction.
+ */
+export function cloneLayerAbove(doc: PixelDocument, sourceId: string): Layer | null {
+  const source = doc.getLayer(sourceId);
+  if (!source) return null;
+
+  const copy = createLayer({
+    name: `${source.name} copy`,
+    width: source.canvas.width,
+    height: source.canvas.height,
+    x: source.x,
+    y: source.y,
+    opacity: source.opacity,
+    blendMode: source.blendMode,
+    visible: source.visible,
+    locked: source.locked,
+    type: source.type,
+  });
+  copy.ctx.drawImage(source.canvas, 0, 0);
+  doc.addLayer(copy, doc.indexOfLayer(source.id) + 1);
+  return copy;
+}
+
 export function duplicateLayers(
   doc: PixelDocument,
   history: History,
@@ -68,22 +93,8 @@ export function duplicateLayers(
   history.transaction(sources.length > 1 ? 'Duplicate Layers' : 'Duplicate Layer', () => {
     // Walk from the top so inserting a copy never shifts a source we still need.
     for (let i = sources.length - 1; i >= 0; i--) {
-      const source = sources[i]!;
-      const copy = createLayer({
-        name: `${source.name} copy`,
-        width: source.canvas.width,
-        height: source.canvas.height,
-        x: source.x,
-        y: source.y,
-        opacity: source.opacity,
-        blendMode: source.blendMode,
-        visible: source.visible,
-        locked: source.locked,
-        type: source.type,
-      });
-      copy.ctx.drawImage(source.canvas, 0, 0);
-      doc.addLayer(copy, doc.indexOfLayer(source.id) + 1);
-      copies.unshift(copy.id);
+      const copy = cloneLayerAbove(doc, sources[i]!.id);
+      if (copy) copies.unshift(copy.id);
     }
     const top = copies[copies.length - 1];
     if (top) doc.setActiveLayer(top);
@@ -253,5 +264,44 @@ export function renameLayer(
 
   history.transaction('Rename Layer', () => {
     layer.name = trimmed;
+  });
+}
+
+export type AlignEdge = 'left' | 'centre' | 'right' | 'top' | 'middle' | 'bottom';
+
+/** Aligns a layer's bounds against the document, as one history entry. */
+export function alignLayerToDocument(
+  doc: PixelDocument,
+  history: History,
+  id: string,
+  edge: AlignEdge,
+): boolean {
+  const layer = doc.getLayer(id);
+  if (!layer || !canEditLayer(layer)) return false;
+
+  const width = layer.canvas.width;
+  const height = layer.canvas.height;
+
+  return history.transaction('Align Layer', () => {
+    switch (edge) {
+      case 'left':
+        layer.x = 0;
+        break;
+      case 'centre':
+        layer.x = Math.round((doc.width - width) / 2);
+        break;
+      case 'right':
+        layer.x = doc.width - width;
+        break;
+      case 'top':
+        layer.y = 0;
+        break;
+      case 'middle':
+        layer.y = Math.round((doc.height - height) / 2);
+        break;
+      case 'bottom':
+        layer.y = doc.height - height;
+        break;
+    }
   });
 }

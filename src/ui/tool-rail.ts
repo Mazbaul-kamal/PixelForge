@@ -3,7 +3,11 @@ import type { ToolManager } from '../tools/tool-manager';
 const ZOOM_ICON =
   '<circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 17 17"/><path d="M6.3 8.6h4.6"/>';
 
+const MOVE_ICON =
+  '<path d="M10 2.5v15M2.5 10h15"/><path d="M10 2.5 7.6 5M10 2.5 12.4 5"/><path d="M10 17.5 7.6 15M10 17.5 12.4 15"/><path d="M2.5 10 5 7.6M2.5 10 5 12.4"/><path d="M17.5 10 15 7.6M17.5 10 15 12.4"/>';
+
 const ICONS: Record<string, string> = {
+  move: MOVE_ICON,
   zoom: ZOOM_ICON,
   hand: '<path d="M6 9V4.6a1.3 1.3 0 0 1 2.6 0V9"/><path d="M8.6 8.6V3.4a1.3 1.3 0 0 1 2.6 0v5.2"/><path d="M11.2 9V4.9a1.3 1.3 0 0 1 2.6 0V12a5.2 5.2 0 0 1-5.2 5.2H8A5 5 0 0 1 3.7 14L2.5 11.7a1.3 1.3 0 0 1 2.1-1.5L6 11.8"/>',
 };

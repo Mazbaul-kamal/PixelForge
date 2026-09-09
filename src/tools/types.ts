@@ -35,7 +35,14 @@ export type OptionSpec =
       default: string;
     }
   | { type: 'checkbox'; id: string; label: string; default: boolean }
-  | { type: 'button'; id: string; label: string; run: (context: ToolContext) => void };
+  | {
+      type: 'button';
+      id: string;
+      label: string;
+      /** Tooltip, for buttons whose label is a glyph. */
+      title?: string;
+      run: (context: ToolContext) => void;
+    };
 
 /** Current values for the active tool's options. */
 export interface ToolOptions {

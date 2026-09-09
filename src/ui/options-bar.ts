@@ -52,6 +52,10 @@ export class OptionsBar {
       button.type = 'button';
       button.className = 'pf-option-button';
       button.textContent = spec.label;
+      if (spec.title) {
+        button.title = spec.title;
+        button.setAttribute('aria-label', spec.title);
+      }
       button.addEventListener('click', () => spec.run(this.tools.context));
       wrap.appendChild(button);
       return wrap;
