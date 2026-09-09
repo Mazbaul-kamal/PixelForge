@@ -2,6 +2,8 @@ import './styles/tokens.css';
 import './styles/shell.css';
 import './styles/panels.css';
 import './styles/layers.css';
+import './styles/chrome.css';
+import './styles/dialog.css';
 
 import { Compositor } from './core/compositor';
 import { PixelDocument } from './core/document';
@@ -11,6 +13,11 @@ import { Viewport } from './core/viewport';
 import { attachViewportNavigation } from './view/navigation';
 import { ViewRenderer } from './view/renderer';
 import { createAppShell } from './ui/shell';
+import { attachFileInput } from './ui/file-drop';
+import { FileActions } from './ui/file-actions';
+import { buildMenuBar } from './ui/menubar';
+import { NoticeStack } from './ui/notice';
+import { UnsavedGuard } from './ui/unsaved-guard';
 import { attachLayerShortcuts } from './ui/layer-shortcuts';
 import { HistoryPanel } from './ui/panels/history-panel';
 import { LayersPanel } from './ui/panels/layers-panel';
@@ -57,6 +64,10 @@ function boot(): void {
     renderer.invalidate();
   };
   history.subscribe(documentChanged);
+  // Any recorded change means this is no longer an untouched boot document.
+  history.subscribe(() => {
+    if (history.canUndo) doc.pristine = false;
+  });
 
   const thumbnails = new ThumbnailCache(() => doc.layers);
   const layersPanel = new LayersPanel(doc, history, thumbnails, documentChanged);
@@ -65,6 +76,47 @@ function boot(): void {
 
   attachHistoryShortcuts(history);
   attachLayerShortcuts(layersPanel);
+
+  // ---- files in and out ----
+  const notices = new NoticeStack(document.body);
+  const unsavedGuard = new UnsavedGuard(history);
+
+  const fileActions = new FileActions({
+    doc,
+    history,
+    notices,
+    onDocumentChanged: documentChanged,
+    onDocumentResized: () => {
+      thumbnails.markAllDirty();
+      viewport.fitToScreen(doc.width, doc.height);
+    },
+    onSaved: () => unsavedGuard.markSaved(),
+  });
+
+  buildMenuBar(shell.menuBar, [
+    {
+      label: 'File',
+      items: [
+        { label: 'New…', shortcut: 'Ctrl+N', run: () => fileActions.newDocument() },
+        { label: 'Open…', shortcut: 'Ctrl+O', run: () => fileActions.chooseFiles() },
+        { label: 'Export As…', shortcut: 'Ctrl+Shift+S', run: () => fileActions.exportImage() },
+      ],
+    },
+  ]);
+
+  attachFileInput(shell.stage, fileActions);
+
+  window.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+
+    if (key === 'n' && !event.shiftKey) fileActions.newDocument();
+    else if (key === 'o') fileActions.chooseFiles();
+    else if (key === 's' && event.shiftKey) fileActions.exportImage();
+    else return;
+
+    event.preventDefault();
+  });
 
   attachViewportNavigation(renderer.canvas, viewport, doc, {
     onPointerPosition: (point) => statusBar.setPointer(point),

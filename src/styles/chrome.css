@@ -1,0 +1,154 @@
+/* ---- menu bar ---- */
+.pf-menubar-filled {
+  display: flex;
+  align-items: stretch;
+  padding-left: 4px;
+}
+
+.pf-menu {
+  position: relative;
+  display: flex;
+}
+
+.pf-menu-button {
+  padding: 0 10px;
+  color: var(--pf-text);
+  background: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pf-menu-button:hover,
+.pf-menu-button[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.pf-menu-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 40;
+  min-width: 210px;
+  padding: 4px;
+  background: var(--pf-bg-panel);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 4px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.pf-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  padding: 5px 9px;
+  color: var(--pf-text);
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pf-menu-item:hover,
+.pf-menu-item:focus-visible {
+  background: var(--pf-accent);
+  color: #08151f;
+  outline: none;
+}
+
+.pf-menu-shortcut {
+  color: var(--pf-text-dim);
+  font-family: var(--pf-font-mono);
+  font-size: 11px;
+}
+
+.pf-menu-item:hover .pf-menu-shortcut,
+.pf-menu-item:focus-visible .pf-menu-shortcut {
+  color: rgba(8, 21, 31, 0.7);
+}
+
+/* ---- drop overlay ---- */
+.pf-drop-overlay {
+  position: absolute;
+  inset: 10px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 20, 20, 0.72);
+  border: 2px dashed var(--pf-accent);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.pf-drop-message {
+  padding: 10px 18px;
+  color: var(--pf-text);
+  font-size: 14px;
+}
+
+/* ---- notices ---- */
+.pf-notices {
+  position: fixed;
+  left: 12px;
+  bottom: 36px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(100vw - 24px));
+}
+
+.pf-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px 9px 12px;
+  background: var(--pf-bg-panel);
+  border: 1px solid var(--pf-line-strong);
+  border-left: 3px solid var(--pf-accent);
+  border-radius: 4px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+
+.pf-notice--error {
+  border-left-color: #e5624c;
+}
+
+.pf-notice-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-notice-title {
+  margin: 0;
+  color: var(--pf-text);
+}
+
+.pf-notice-detail {
+  margin: 3px 0 0;
+  color: var(--pf-text-dim);
+  line-height: 1.5;
+}
+
+.pf-notice-close {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--pf-text-dim);
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pf-notice-close:hover {
+  color: var(--pf-text);
+  background: rgba(255, 255, 255, 0.08);
+}

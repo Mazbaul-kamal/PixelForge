@@ -1,0 +1,126 @@
+.pf-dialog {
+  min-width: 330px;
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 0;
+  color: var(--pf-text);
+  background: var(--pf-bg-panel);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 6px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  font-family: var(--pf-font);
+  font-size: 12px;
+}
+
+.pf-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.pf-dialog-title {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--pf-line);
+}
+
+.pf-dialog-body {
+  padding: 14px 16px;
+}
+
+.pf-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.pf-dialog-message,
+.pf-dialog-note {
+  margin: 0;
+  color: var(--pf-text-dim);
+  line-height: 1.6;
+}
+
+.pf-dialog-note {
+  margin-top: 2px;
+}
+
+.pf-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--pf-line);
+}
+
+.pf-button {
+  padding: 5px 14px;
+  color: var(--pf-text);
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pf-button:hover {
+  border-color: var(--pf-text-dim);
+}
+
+.pf-button--primary {
+  color: #08151f;
+  background: var(--pf-accent);
+  border-color: var(--pf-accent);
+  font-weight: 600;
+}
+
+.pf-button:focus-visible {
+  outline: 2px solid var(--pf-accent);
+  outline-offset: 1px;
+}
+
+.pf-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.pf-preset {
+  padding: 6px 8px;
+  color: var(--pf-text-dim);
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pf-preset:hover {
+  color: var(--pf-text);
+  border-color: var(--pf-accent);
+}
+
+.pf-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 7px;
+  color: var(--pf-text);
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+  font: inherit;
+}
+
+.pf-colour {
+  width: 34px;
+  height: 24px;
+  padding: 1px;
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.pf-unit {
+  color: var(--pf-text-dim);
+}

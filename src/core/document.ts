@@ -11,6 +11,14 @@ export class PixelDocument {
   activeLayerId: string | null = null;
   /** Owned by the selection engine in a later step. */
   selection: SelectionMask | null = null;
+  /** Used for the export filename and the window title. */
+  name = 'Untitled';
+  /**
+   * True while this is still a fresh document nobody has touched. The first
+   * image opened into a pristine document replaces it instead of landing as a
+   * floating layer. Latched off by the first history entry.
+   */
+  pristine = true;
 
   constructor(width: number, height: number) {
     this.width = Math.max(1, Math.round(width));
