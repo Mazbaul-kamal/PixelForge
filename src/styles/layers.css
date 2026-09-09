@@ -1,0 +1,221 @@
+.pf-panel--layers {
+  flex: 1.4;
+  min-height: 180px;
+}
+
+.pf-panel--layers .pf-panel-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.pf-layer-controls {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--pf-line);
+}
+
+.pf-layer-list {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.pf-layer-list:focus-visible {
+  outline: 1px solid var(--pf-accent);
+  outline-offset: -1px;
+}
+
+.pf-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--pf-line-2, transparent);
+  border-left: 2px solid transparent;
+  cursor: default;
+  user-select: none;
+  /* Vertical panning still scrolls; a hold starts a drag instead. */
+  touch-action: pan-y;
+}
+
+.pf-layer-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pf-layer-row.is-selected {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pf-layer-row.is-active {
+  background: rgba(76, 159, 254, 0.16);
+  border-left-color: var(--pf-accent);
+}
+
+.pf-layer-row.is-dragging {
+  opacity: 0.4;
+}
+
+.pf-layer-row.is-hidden .pf-layer-name {
+  color: var(--pf-text-dim);
+  font-style: italic;
+}
+
+.pf-layer-eye,
+.pf-layer-lock {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--pf-text-dim);
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.pf-layer-eye svg,
+.pf-layer-lock svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pf-layer-eye:hover,
+.pf-layer-lock:hover {
+  color: var(--pf-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pf-layer-row.is-hidden .pf-layer-eye {
+  opacity: 0.5;
+}
+
+/* The lock stays legible on touch, where there is no hover, but keeps quiet
+   until it is actually engaged. */
+.pf-layer-lock {
+  opacity: 0.35;
+}
+
+.pf-layer-row:hover .pf-layer-lock {
+  opacity: 0.7;
+}
+
+.pf-layer-lock.is-on {
+  opacity: 1;
+  color: var(--pf-accent);
+}
+
+.pf-layer-thumb {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.pf-thumb-canvas {
+  display: block;
+  width: 36px;
+  height: 36px;
+}
+
+.pf-layer-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-layer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-layer-badge {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: var(--pf-text-dim);
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 2px;
+}
+
+.pf-layer-rename {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 4px;
+  color: var(--pf-text);
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-accent);
+  border-radius: 2px;
+  font: inherit;
+}
+
+.pf-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--pf-accent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.pf-layer-list.is-reordering .pf-layer-row {
+  touch-action: none;
+}
+
+.pf-layer-actions {
+  display: flex;
+  gap: 2px;
+  padding: 5px 7px;
+  border-top: 1px solid var(--pf-line);
+}
+
+.pf-layer-action {
+  flex: 1;
+  height: 22px;
+  padding: 0;
+  color: var(--pf-text-dim);
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pf-layer-action:hover:not(:disabled) {
+  color: var(--pf-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pf-layer-action:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.pf-layer-action:focus-visible {
+  outline: 1px solid var(--pf-accent);
+  outline-offset: -1px;
+}

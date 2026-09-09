@@ -1,5 +1,33 @@
 import type { PixelDocument } from './document';
+import type { Layer } from './types';
 import { blendModeToComposite } from './types';
+
+/**
+ * Draws layers bottom-first into `ctx`, honouring opacity and blend mode.
+ * Shared by the compositor and by merge/flatten so there is exactly one place
+ * that decides what a stack of layers looks like.
+ */
+export function drawLayers(
+  ctx: CanvasRenderingContext2D,
+  layers: readonly Layer[],
+  offsetX = 0,
+  offsetY = 0,
+): void {
+  const previousAlpha = ctx.globalAlpha;
+  const previousComposite = ctx.globalCompositeOperation;
+
+  for (const layer of layers) {
+    if (!layer.visible || layer.opacity <= 0) continue;
+    if (layer.canvas.width === 0 || layer.canvas.height === 0) continue;
+
+    ctx.globalAlpha = Math.min(Math.max(layer.opacity, 0), 1);
+    ctx.globalCompositeOperation = blendModeToComposite(layer.blendMode);
+    ctx.drawImage(layer.canvas, layer.x - offsetX, layer.y - offsetY);
+  }
+
+  ctx.globalAlpha = previousAlpha;
+  ctx.globalCompositeOperation = previousComposite;
+}
 
 /**
  * The single offscreen canvas at document size that every layer is drawn into.
@@ -56,14 +84,7 @@ export class Compositor {
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    for (const layer of doc.layers) {
-      if (!layer.visible || layer.opacity <= 0) continue;
-      if (layer.canvas.width === 0 || layer.canvas.height === 0) continue;
-
-      ctx.globalAlpha = Math.min(Math.max(layer.opacity, 0), 1);
-      ctx.globalCompositeOperation = blendModeToComposite(layer.blendMode);
-      ctx.drawImage(layer.canvas, layer.x, layer.y);
-    }
+    drawLayers(ctx, doc.layers);
 
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';

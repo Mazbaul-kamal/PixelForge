@@ -1,0 +1,164 @@
+import type { Layer } from '../../core/types';
+import type { ThumbnailCache } from '../thumbnails';
+
+const EYE_OPEN =
+  '<path d="M1 7s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z"/><circle cx="7" cy="7" r="1.9"/>';
+const EYE_CLOSED = '<path d="M1.5 4.2C2.9 6.1 4.8 7.4 7 7.4s4.1-1.3 5.5-3.2"/><path d="M3.3 8.6 2 10.4"/><path d="M10.7 8.6 12 10.4"/><path d="M7 7.4V10"/>';
+const LOCK_CLOSED =
+  '<rect x="2.5" y="6" width="9" height="6.2" rx="1.2"/><path d="M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6"/>';
+const LOCK_OPEN =
+  '<rect x="2.5" y="6" width="9" height="6.2" rx="1.2"/><path d="M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0"/>';
+
+function icon(paths: string): SVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 14 14');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = paths;
+  return svg;
+}
+
+export interface LayerRowCallbacks {
+  onToggleVisible: (id: string) => void;
+  onToggleLock: (id: string) => void;
+  onPick: (id: string, event: MouseEvent) => void;
+  onRename: (id: string, name: string) => void;
+}
+
+export interface LayerRowState {
+  active: boolean;
+  selected: boolean;
+}
+
+/** One row of the layers list. Rebuilt only when the layer list changes. */
+export class LayerRow {
+  readonly root: HTMLElement;
+  readonly id: string;
+
+  private readonly thumbHost: HTMLElement;
+  private readonly nameEl: HTMLElement;
+  private readonly badge: HTMLElement;
+  private readonly eyeButton: HTMLButtonElement;
+  private readonly lockButton: HTMLButtonElement;
+  private readonly thumbs: ThumbnailCache;
+  private readonly callbacks: LayerRowCallbacks;
+  private editor: HTMLInputElement | null = null;
+
+  constructor(layer: Layer, thumbs: ThumbnailCache, callbacks: LayerRowCallbacks) {
+    this.id = layer.id;
+    this.thumbs = thumbs;
+    this.callbacks = callbacks;
+
+    this.root = document.createElement('div');
+    this.root.className = 'pf-layer-row';
+    this.root.dataset['layerId'] = layer.id;
+    this.root.setAttribute('role', 'option');
+    this.root.tabIndex = -1;
+
+    this.eyeButton = document.createElement('button');
+    this.eyeButton.type = 'button';
+    this.eyeButton.className = 'pf-layer-eye';
+    this.eyeButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      callbacks.onToggleVisible(this.id);
+    });
+
+    this.thumbHost = document.createElement('div');
+    this.thumbHost.className = 'pf-layer-thumb';
+
+    const meta = document.createElement('div');
+    meta.className = 'pf-layer-meta';
+
+    this.nameEl = document.createElement('span');
+    this.nameEl.className = 'pf-layer-name';
+
+    this.badge = document.createElement('span');
+    this.badge.className = 'pf-layer-badge';
+
+    meta.append(this.nameEl, this.badge);
+
+    this.lockButton = document.createElement('button');
+    this.lockButton.type = 'button';
+    this.lockButton.className = 'pf-layer-lock';
+    this.lockButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      callbacks.onToggleLock(this.id);
+    });
+
+    this.root.append(this.eyeButton, this.thumbHost, meta, this.lockButton);
+
+    this.root.addEventListener('click', (event) => {
+      if (this.editor) return;
+      callbacks.onPick(this.id, event);
+    });
+    this.nameEl.addEventListener('dblclick', (event) => {
+      event.stopPropagation();
+      this.beginRename();
+    });
+
+    this.update(layer, { active: false, selected: false });
+  }
+
+  update(layer: Layer, state: LayerRowState): void {
+    const thumb = this.thumbs.canvasFor(layer);
+    if (thumb.parentElement !== this.thumbHost) this.thumbHost.replaceChildren(thumb);
+
+    if (!this.editor) this.nameEl.textContent = layer.name;
+    this.root.classList.toggle('is-active', state.active);
+    this.root.classList.toggle('is-selected', state.selected);
+    this.root.classList.toggle('is-hidden', !layer.visible);
+    this.root.classList.toggle('is-locked', layer.locked);
+    this.root.setAttribute('aria-selected', state.selected ? 'true' : 'false');
+
+    this.eyeButton.replaceChildren(icon(layer.visible ? EYE_OPEN : EYE_CLOSED));
+    this.eyeButton.setAttribute('aria-label', layer.visible ? 'Hide layer' : 'Show layer');
+    this.eyeButton.title = layer.visible ? 'Hide layer' : 'Show layer';
+
+    this.lockButton.replaceChildren(icon(layer.locked ? LOCK_CLOSED : LOCK_OPEN));
+    this.lockButton.classList.toggle('is-on', layer.locked);
+    this.lockButton.setAttribute('aria-label', layer.locked ? 'Unlock layer' : 'Lock layer');
+    this.lockButton.title = layer.locked ? 'Unlock layer' : 'Lock layer';
+
+    // Only non-raster layers carry a type badge.
+    if (layer.type === 'raster') {
+      this.badge.hidden = true;
+      this.badge.textContent = '';
+    } else {
+      this.badge.hidden = false;
+      this.badge.textContent = layer.type.charAt(0).toUpperCase() + layer.type.slice(1);
+    }
+  }
+
+  /** Swaps the name for a text field. Enter commits, Escape abandons. */
+  beginRename(): void {
+    if (this.editor) return;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'pf-layer-rename';
+    input.value = this.nameEl.textContent ?? '';
+    this.editor = input;
+
+    let settled = false;
+    const settle = (commit: boolean): void => {
+      if (settled) return;
+      settled = true;
+      const value = input.value;
+      this.editor = null;
+      input.replaceWith(this.nameEl);
+      if (commit) this.callbacks.onRename(this.id, value);
+    };
+
+    input.addEventListener('keydown', (event) => {
+      event.stopPropagation();
+      if (event.key === 'Enter') settle(true);
+      else if (event.key === 'Escape') settle(false);
+    });
+    input.addEventListener('blur', () => settle(true));
+    input.addEventListener('click', (event) => event.stopPropagation());
+    input.addEventListener('pointerdown', (event) => event.stopPropagation());
+
+    this.nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+}

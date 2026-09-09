@@ -1,6 +1,7 @@
 import './styles/tokens.css';
 import './styles/shell.css';
 import './styles/panels.css';
+import './styles/layers.css';
 
 import { Compositor } from './core/compositor';
 import { PixelDocument } from './core/document';
@@ -10,10 +11,12 @@ import { Viewport } from './core/viewport';
 import { attachViewportNavigation } from './view/navigation';
 import { ViewRenderer } from './view/renderer';
 import { createAppShell } from './ui/shell';
+import { attachLayerShortcuts } from './ui/layer-shortcuts';
 import { HistoryPanel } from './ui/panels/history-panel';
-import { LayerProperties } from './ui/panels/layer-properties';
+import { LayersPanel } from './ui/panels/layers-panel';
 import { attachHistoryShortcuts } from './ui/shortcuts';
 import { StatusBar } from './ui/statusbar';
+import { ThumbnailCache } from './ui/thumbnails';
 
 const BOOT_WIDTH = 1200;
 const BOOT_HEIGHT = 800;
@@ -55,11 +58,13 @@ function boot(): void {
   };
   history.subscribe(documentChanged);
 
-  const layerProperties = new LayerProperties(doc, history, documentChanged);
+  const thumbnails = new ThumbnailCache(() => doc.layers);
+  const layersPanel = new LayersPanel(doc, history, thumbnails, documentChanged);
   const historyPanel = new HistoryPanel(history);
-  shell.panels.append(layerProperties.root, historyPanel.root);
+  shell.panels.append(layersPanel.root, historyPanel.root);
 
   attachHistoryShortcuts(history);
+  attachLayerShortcuts(layersPanel);
 
   attachViewportNavigation(renderer.canvas, viewport, doc, {
     onPointerPosition: (point) => statusBar.setPointer(point),
