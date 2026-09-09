@@ -55,5 +55,9 @@ export function createHandTool(): Tool {
       dragging = false;
       context.setCursor(null);
     },
+
+    onRailDoubleClick(context: ToolContext): void {
+      context.viewport.fitToScreen(context.doc.width, context.doc.height);
+    },
   };
 }

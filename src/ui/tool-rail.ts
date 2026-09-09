@@ -1,6 +1,10 @@
 import type { ToolManager } from '../tools/tool-manager';
 
+const ZOOM_ICON =
+  '<circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 17 17"/><path d="M6.3 8.6h4.6"/>';
+
 const ICONS: Record<string, string> = {
+  zoom: ZOOM_ICON,
   hand: '<path d="M6 9V4.6a1.3 1.3 0 0 1 2.6 0V9"/><path d="M8.6 8.6V3.4a1.3 1.3 0 0 1 2.6 0v5.2"/><path d="M11.2 9V4.9a1.3 1.3 0 0 1 2.6 0V12a5.2 5.2 0 0 1-5.2 5.2H8A5 5 0 0 1 3.7 14L2.5 11.7a1.3 1.3 0 0 1 2.1-1.5L6 11.8"/>',
 };
 
@@ -56,6 +60,10 @@ export class ToolRail {
         button.setAttribute('aria-label', `${tool.name} tool, shortcut ${tool.shortcut}`);
         button.appendChild(icon(tool.id));
         button.addEventListener('click', () => this.tools.setActiveTool(tool.id));
+        button.addEventListener('dblclick', () => {
+          this.tools.setActiveTool(tool.id);
+          tool.onRailDoubleClick?.(this.tools.context);
+        });
 
         this.buttons.set(tool.id, button);
         list.appendChild(button);

@@ -1,10 +1,14 @@
 import type { Point } from './types';
+import { nextZoomStop } from './zoom-ladder';
 
 export const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 32;
 
 /** Padding kept between the document and the edge of the stage when fitting. */
 const FIT_PADDING = 48;
+
+/** The document can always be grabbed back: this much of it stays on screen. */
+export const MIN_VISIBLE_PX = 60;
 
 /**
  * Maps document coordinates to the on-screen stage and back.
@@ -21,6 +25,17 @@ export class Viewport {
 
   onChange: (() => void) | null = null;
 
+  /** Document size, needed to keep part of it on screen while panning. */
+  private contentWidth = 0;
+  private contentHeight = 0;
+
+  setContentSize(width: number, height: number): void {
+    if (width === this.contentWidth && height === this.contentHeight) return;
+    this.contentWidth = width;
+    this.contentHeight = height;
+    if (this.applyPan(this.panX, this.panY)) this.emit();
+  }
+
   screenToDoc(screenX: number, screenY: number): Point {
     return { x: (screenX - this.panX) / this.zoom, y: (screenY - this.panY) / this.zoom };
   }
@@ -31,16 +46,30 @@ export class Viewport {
 
   panBy(dx: number, dy: number): void {
     if (dx === 0 && dy === 0) return;
-    this.panX += dx;
-    this.panY += dy;
-    this.emit();
+    if (this.applyPan(this.panX + dx, this.panY + dy)) this.emit();
   }
 
   panTo(x: number, y: number): void {
-    if (this.panX === x && this.panY === y) return;
-    this.panX = x;
-    this.panY = y;
-    this.emit();
+    if (this.applyPan(x, y)) this.emit();
+  }
+
+  /**
+   * Writes a pan position, clamped so the document can never be dragged
+   * entirely off screen. Returns true when the position actually moved.
+   */
+  private applyPan(x: number, y: number): boolean {
+    const clamped = this.clampPan(x, y);
+    if (clamped.x === this.panX && clamped.y === this.panY) return false;
+    this.panX = clamped.x;
+    this.panY = clamped.y;
+    return true;
+  }
+
+  private clampPan(x: number, y: number): Point {
+    return {
+      x: clampAxis(x, this.contentWidth * this.zoom, this.viewWidth),
+      y: clampAxis(y, this.contentHeight * this.zoom, this.viewHeight),
+    };
   }
 
   /** Sets zoom while holding the document point under (anchorX, anchorY) still. */
@@ -53,8 +82,7 @@ export class Viewport {
     const before = this.screenToDoc(ax, ay);
 
     this.zoom = next;
-    this.panX = ax - before.x * next;
-    this.panY = ay - before.y * next;
+    this.applyPan(ax - before.x * next, ay - before.y * next);
     this.emit();
   }
 
@@ -62,9 +90,9 @@ export class Viewport {
     this.setZoom(this.zoom * factor, anchorX, anchorY);
   }
 
-  /** Steps through a fixed ladder so keyboard zoom lands on predictable stops. */
+  /** Steps to the next standard zoom stop, so zooming lands on exact values. */
   zoomStep(direction: 1 | -1, anchorX?: number, anchorY?: number): void {
-    this.setZoom(this.zoom * (direction > 0 ? 2 : 0.5), anchorX, anchorY);
+    this.setZoom(nextZoomStop(this.zoom, direction), anchorX, anchorY);
   }
 
   fitToScreen(docWidth: number, docHeight: number): void {
@@ -81,6 +109,17 @@ export class Viewport {
     this.emit();
   }
 
+  /** Zooms so the document covers the stage, cropping the longer side. */
+  fillScreen(docWidth: number, docHeight: number): void {
+    if (this.viewWidth <= 0 || this.viewHeight <= 0) return;
+
+    this.zoom = clampZoom(
+      Math.max(this.viewWidth / docWidth, this.viewHeight / docHeight),
+    );
+    this.centreDocument(docWidth, docHeight);
+    this.emit();
+  }
+
   /** 100% zoom, keeping the document centred in the stage. */
   actualSize(docWidth: number, docHeight: number): void {
     this.zoom = 1;
@@ -89,8 +128,10 @@ export class Viewport {
   }
 
   centreDocument(docWidth: number, docHeight: number): void {
-    this.panX = Math.round((this.viewWidth - docWidth * this.zoom) / 2);
-    this.panY = Math.round((this.viewHeight - docHeight * this.zoom) / 2);
+    this.applyPan(
+      Math.round((this.viewWidth - docWidth * this.zoom) / 2),
+      Math.round((this.viewHeight - docHeight * this.zoom) / 2),
+    );
   }
 
   /**
@@ -109,8 +150,7 @@ export class Viewport {
     this.viewHeight = height;
 
     if (anchor) {
-      this.panX = width / 2 - anchor.x * this.zoom;
-      this.panY = height / 2 - anchor.y * this.zoom;
+      this.applyPan(width / 2 - anchor.x * this.zoom, height / 2 - anchor.y * this.zoom);
     }
     this.emit();
   }
@@ -123,4 +163,20 @@ export class Viewport {
 export function clampZoom(zoom: number): number {
   if (!Number.isFinite(zoom)) return 1;
   return Math.min(Math.max(zoom, MIN_ZOOM), MAX_ZOOM);
+}
+
+/**
+ * Keeps `MIN_VISIBLE_PX` of the content on screen along one axis. A document
+ * smaller than that on screen has to stay fully visible instead.
+ */
+function clampAxis(pan: number, contentLength: number, viewLength: number): number {
+  if (contentLength <= 0 || viewLength <= 0) return pan;
+
+  const required = Math.min(MIN_VISIBLE_PX, contentLength);
+  const min = required - contentLength;
+  const max = viewLength - required;
+
+  // Too little room to satisfy both edges: centre instead.
+  if (min > max) return (viewLength - contentLength) / 2;
+  return Math.min(Math.max(pan, min), max);
 }

@@ -13,6 +13,7 @@ import { History } from './core/history';
 import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
 import { createHandTool } from './tools/hand-tool';
+import { createZoomTool } from './tools/zoom-tool';
 import { ToolManager } from './tools/tool-manager';
 import { attachViewportNavigation } from './view/navigation';
 import { ViewRenderer } from './view/renderer';
@@ -25,6 +26,7 @@ import { ColourSwatches } from './ui/colour-swatches';
 import { NoticeStack } from './ui/notice';
 import { OptionsBar } from './ui/options-bar';
 import { ToolRail } from './ui/tool-rail';
+import { attachViewShortcuts } from './ui/view-shortcuts';
 import { UnsavedGuard } from './ui/unsaved-guard';
 import { attachLayerShortcuts } from './ui/layer-shortcuts';
 import { HistoryPanel } from './ui/panels/history-panel';
@@ -41,7 +43,6 @@ function boot(): void {
   if (!mount) throw new Error('Missing #app mount point.');
 
   const shell = createAppShell(mount);
-  const statusBar = new StatusBar(shell.statusBar);
 
   const doc = new PixelDocument(BOOT_WIDTH, BOOT_HEIGHT);
   doc.addLayer(
@@ -55,6 +56,11 @@ function boot(): void {
 
   const compositor = new Compositor(doc);
   const viewport = new Viewport();
+  viewport.setContentSize(doc.width, doc.height);
+
+  const statusBar = new StatusBar(shell.statusBar, {
+    onZoomEntered: (zoom) => viewport.setZoom(zoom),
+  });
   const renderer = new ViewRenderer(shell.stage, doc, compositor, viewport);
 
   viewport.onChange = () => {
@@ -68,6 +74,7 @@ function boot(): void {
   // picks up a document resize) and asks the view for a fresh frame.
   const documentChanged = (): void => {
     compositor.syncSize();
+    viewport.setContentSize(doc.width, doc.height);
     statusBar.setDocumentSize(doc.width, doc.height);
     renderer.invalidate();
   };
@@ -126,9 +133,10 @@ function boot(): void {
     event.preventDefault();
   });
 
-  attachViewportNavigation(renderer.canvas, viewport, doc, {
+  attachViewportNavigation(renderer.canvas, viewport, {
     onPointerPosition: (point) => statusBar.setPointer(point),
   });
+  attachViewShortcuts(viewport, doc);
 
   // ---- tools ----
   const colours = new ColourState();
@@ -145,6 +153,7 @@ function boot(): void {
   renderer.setOverlayPainter((ctx) => toolManager.drawOverlay(ctx));
 
   toolManager.register(createHandTool());
+  toolManager.register(createZoomTool());
   // Holding Space borrows the Hand tool and springs back on release. Step 15
   // registers Alt for the Eyedropper the same way, once that tool exists.
   toolManager.registerTemporaryOverride('space', 'hand');

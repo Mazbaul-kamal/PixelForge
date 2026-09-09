@@ -1,4 +1,3 @@
-import type { PixelDocument } from '../core/document';
 import type { Point } from '../core/types';
 import type { Viewport } from '../core/viewport';
 
@@ -20,13 +19,14 @@ interface ActivePointer {
 }
 
 /**
- * Viewport navigation: wheel zoom towards the pointer, shift+wheel and
- * middle-drag pan, touch drag and pinch, and the zoom keyboard shortcuts.
+ * Viewport navigation that is not a tool: wheel zoom towards the pointer,
+ * shift+wheel and middle-drag pan, and two-finger pinch. Single-pointer input
+ * belongs to the active tool, and the zoom keyboard shortcuts live in
+ * view-shortcuts.ts.
  */
 export function attachViewportNavigation(
   surface: HTMLCanvasElement,
   viewport: Viewport,
-  doc: PixelDocument,
   options: NavigationOptions = {},
 ): () => void {
   const pointers = new Map<number, ActivePointer>();
@@ -172,30 +172,6 @@ export function attachViewportNavigation(
     if (event.button === 1) event.preventDefault();
   };
 
-  const onKeyDown = (event: KeyboardEvent): void => {
-    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-
-    switch (event.key) {
-      case '0':
-        viewport.fitToScreen(doc.width, doc.height);
-        break;
-      case '1':
-        viewport.actualSize(doc.width, doc.height);
-        break;
-      case '=':
-      case '+':
-        viewport.zoomStep(1);
-        break;
-      case '-':
-      case '_':
-        viewport.zoomStep(-1);
-        break;
-      default:
-        return;
-    }
-    event.preventDefault();
-  };
-
   window.addEventListener('scroll', refreshRect, true);
   surface.addEventListener('wheel', onWheel, { passive: false });
   surface.addEventListener('pointerdown', onPointerDown);
@@ -204,7 +180,6 @@ export function attachViewportNavigation(
   surface.addEventListener('pointercancel', endPointer);
   surface.addEventListener('pointerleave', onPointerLeave);
   surface.addEventListener('mousedown', onMouseDown);
-  window.addEventListener('keydown', onKeyDown);
 
   return () => {
     rectObserver.disconnect();
@@ -216,6 +191,5 @@ export function attachViewportNavigation(
     surface.removeEventListener('pointercancel', endPointer);
     surface.removeEventListener('pointerleave', onPointerLeave);
     surface.removeEventListener('mousedown', onMouseDown);
-    window.removeEventListener('keydown', onKeyDown);
   };
 }

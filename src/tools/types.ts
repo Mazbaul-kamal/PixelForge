@@ -104,4 +104,7 @@ export interface Tool {
 
   activate?(context: ToolContext): void;
   deactivate?(context: ToolContext): void;
+
+  /** Double-clicking this tool's rail button, e.g. Hand fits the document. */
+  onRailDoubleClick?(context: ToolContext): void;
 }
