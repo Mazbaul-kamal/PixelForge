@@ -12,6 +12,7 @@ import { PixelDocument } from './core/document';
 import { History } from './core/history';
 import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
+import { createBrushTool } from './tools/brush-tool';
 import { createHandTool } from './tools/hand-tool';
 import { createMoveTool } from './tools/move-tool';
 import { createZoomTool } from './tools/zoom-tool';
@@ -149,11 +150,16 @@ function boot(): void {
     colours,
     requestRender: renderer.invalidate,
     invalidateComposite: documentChanged,
+    setLiveStroke: (stroke) => {
+      compositor.setLiveStroke(stroke);
+      renderer.invalidate();
+    },
   });
 
   renderer.setOverlayPainter((ctx) => toolManager.drawOverlay(ctx));
 
   toolManager.register(createMoveTool());
+  toolManager.register(createBrushTool());
   toolManager.register(createHandTool());
   toolManager.register(createZoomTool());
   // Holding Space borrows the Hand tool and springs back on release. Step 15

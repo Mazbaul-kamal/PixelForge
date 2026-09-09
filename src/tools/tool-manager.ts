@@ -3,7 +3,10 @@ import type { PixelDocument } from '../core/document';
 import type { History } from '../core/history';
 import type { Viewport } from '../core/viewport';
 import { isTextEntry } from '../ui/keyboard';
-import type { OptionSpec, Tool, ToolContext, ToolOptions, ToolPointer } from './types';
+import type { LiveStroke } from '../core/compositor';
+import type {
+  OptionSpec, Tool, ToolContext, ToolOptions, ToolPointer, ToolSample,
+} from './types';
 
 export interface ToolManagerDeps {
   surface: HTMLCanvasElement;
@@ -13,6 +16,7 @@ export interface ToolManagerDeps {
   colours: ColourState;
   requestRender: () => void;
   invalidateComposite: () => void;
+  setLiveStroke: (stroke: LiveStroke | null) => void;
 }
 
 function defaultsOf(specs: readonly OptionSpec[]): Map<string, unknown> {
@@ -80,6 +84,7 @@ export class ToolManager {
       },
       requestRender: deps.requestRender,
       invalidateComposite: deps.invalidateComposite,
+      setLiveStroke: deps.setLiveStroke,
       setCursor: (cursor) => {
         this.cursorOverride = cursor;
         this.applyCursor();
@@ -165,14 +170,33 @@ export class ToolManager {
 
   private toPointer(event: PointerEvent): ToolPointer {
     const rect = this.deps.surface.getBoundingClientRect();
-    const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const sample = (source: PointerEvent | MouseEvent, pressure: number, tiltX: number, tiltY: number): ToolSample => {
+      const screen = { x: source.clientX - rect.left, y: source.clientY - rect.top };
+      return {
+        doc: this.deps.viewport.screenToDoc(screen.x, screen.y),
+        screen,
+        pressure,
+        tiltX,
+        tiltY,
+      };
+    };
+
+    // Mice report 0 pressure while down; 0.5 is the conventional stand-in.
+    const pressureOf = (source: PointerEvent): number =>
+      source.pressure > 0 ? source.pressure : source.buttons !== 0 ? 0.5 : 0;
+
+    const self = sample(event, pressureOf(event), event.tiltX, event.tiltY);
+
+    // A high-refresh stylus batches several samples into one event.
+    let coalesced: ToolSample[] = [self];
+    const raw = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
+    if (raw.length > 1) {
+      coalesced = raw.map((one) => sample(one, pressureOf(one), one.tiltX, one.tiltY));
+    }
+
     return {
-      doc: this.deps.viewport.screenToDoc(screen.x, screen.y),
-      screen,
-      // Mice report 0 pressure while down; 0.5 is the conventional stand-in.
-      pressure: event.pressure > 0 ? event.pressure : event.buttons !== 0 ? 0.5 : 0,
-      tiltX: event.tiltX,
-      tiltY: event.tiltY,
+      ...self,
+      coalesced,
       button: event.button,
       buttons: event.buttons,
       pointerId: event.pointerId,

@@ -1,6 +1,7 @@
 import type { ColourState } from '../core/colour-state';
 import type { PixelDocument } from '../core/document';
 import type { History } from '../core/history';
+import type { LiveStroke } from '../core/compositor';
 import type { Layer, Point, SelectionMask } from '../core/types';
 import type { Viewport } from '../core/viewport';
 
@@ -51,8 +52,8 @@ export interface ToolOptions {
   subscribe(listener: () => void): () => void;
 }
 
-/** One pointer sample, already converted into document coordinates. */
-export interface ToolPointer {
+/** One position along a pointer's path, in document coordinates. */
+export interface ToolSample {
   /** Document coordinates. Tools work in these. */
   readonly doc: Point;
   /** CSS pixels relative to the view canvas. */
@@ -61,6 +62,16 @@ export interface ToolPointer {
   readonly pressure: number;
   readonly tiltX: number;
   readonly tiltY: number;
+}
+
+/** One pointer event, already converted into document coordinates. */
+export interface ToolPointer extends ToolSample {
+  /**
+   * Every sample the device actually captured for this event, oldest first,
+   * ending with this one. A 240Hz stylus reports several samples per frame,
+   * and a stroke engine must consume them all or fast strokes go polygonal.
+   */
+  readonly coalesced: readonly ToolSample[];
   readonly button: number;
   readonly buttons: number;
   readonly pointerId: number;
@@ -84,6 +95,12 @@ export interface ToolContext {
   requestRender(): void;
   /** Report that layer pixels or layer properties changed. */
   invalidateComposite(): void;
+  /**
+   * Shows an in-progress stroke composited in the right place in the layer
+   * stack. Passing null clears it. Used by every tool that paints into a
+   * buffer before committing it to the layer.
+   */
+  setLiveStroke(stroke: LiveStroke | null): void;
   /** Temporarily override the tool's cursor, e.g. while dragging. */
   setCursor(cursor: string | null): void;
 }
