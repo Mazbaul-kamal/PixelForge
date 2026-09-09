@@ -46,6 +46,8 @@ export function blendModeToComposite(mode: BlendMode): GlobalCompositeOperation 
   return mode === 'normal' ? 'source-over' : mode;
 }
 
+import type { TextLayerData } from './text-layer';
+
 /** Raster is the only kind step 1 creates; the others are produced by later steps. */
 export type LayerType = 'raster' | 'text' | 'shape' | 'adjustment';
 
@@ -77,4 +79,9 @@ export interface Layer {
   type: LayerType;
   /** Layer mask bitmap. Applied by the mask engine in a later step. */
   mask?: HTMLCanvasElement;
+  /**
+   * Set on text layers. The bitmap is only a render of this, so the string and
+   * its style stay editable. Immutable: edits replace the whole object.
+   */
+  text?: TextLayerData;
 }

@@ -24,6 +24,7 @@ import { deselect, invertSelection, selectAll, setSelection } from './core/selec
 import { createLassoTool } from './tools/lasso-tool';
 import { createBucketTool } from './tools/bucket-tool';
 import { createCropTool } from './tools/crop-tool';
+import { createTextTool } from './tools/text-tool';
 import { createEyedropperTool } from './tools/eyedropper-tool';
 import { createGradientTool } from './tools/gradient-tool';
 import { createMagicWandTool } from './tools/magic-wand-tool';
@@ -46,6 +47,7 @@ import { ColourSwatches } from './ui/colour-swatches';
 import { BusyIndicator } from './ui/busy-indicator';
 import { openFillDialog } from './ui/dialogs/fill-dialog';
 import { openGradientEditor } from './ui/dialogs/gradient-editor';
+import { openTextEditor } from './ui/text-editor-overlay';
 import { NoticeStack } from './ui/notice';
 import { OptionsBar } from './ui/options-bar';
 import { ToolRail } from './ui/tool-rail';
@@ -281,6 +283,31 @@ function boot(): void {
   toolManager.register(createEyedropperTool({ onHover: (sample) => infoPanel.show(sample) }));
   // Alt borrows the eyedropper from any tool and springs back on release.
   toolManager.registerTemporaryOverride('alt', 'eyedropper');
+  toolManager.register(
+    createTextTool({
+      beginEditing: (layer, padding, onInput, onFinish) => {
+        const editor = openTextEditor({
+          host: shell.stage,
+          layer,
+          viewport,
+          padding,
+          onInput,
+          onCommit: () => onFinish(true),
+          onCancel: () => onFinish(false),
+        });
+        return {
+          layer,
+          reposition: () => editor.reposition(padding),
+          close: () => editor.destroy(),
+        };
+      },
+      onChanged: () => {
+        thumbnails.markAllDirty();
+        documentChanged();
+      },
+    }),
+  );
+
   toolManager.register(
     createCropTool({
       onCommitted: () => {

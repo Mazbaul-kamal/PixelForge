@@ -188,3 +188,25 @@
   margin: 0;
   accent-color: var(--pf-accent);
 }
+
+/* ---- on-canvas text editing ---- */
+.pf-text-editor {
+  position: absolute;
+  z-index: 25;
+  margin: 0;
+  padding: 0;
+  /* The glyphs are drawn by the layer itself; this supplies caret and
+     selection only, so its own text must not show. */
+  color: transparent;
+  caret-color: #ffffff;
+  background: none;
+  border: 0;
+  outline: none;
+  transform-origin: 0 0;
+  white-space: pre;
+  overflow-wrap: break-word;
+}
+
+.pf-text-editor::selection {
+  background: rgba(76, 159, 254, 0.45);
+}

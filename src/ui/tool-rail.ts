@@ -36,7 +36,10 @@ const EYEDROPPER_ICON =
 const CROP_ICON =
   '<path d="M5.5 2v12.5H18"/><path d="M2 5.5h12.5V18"/>';
 
+const TEXT_ICON = '<path d="M4 4.5h12"/><path d="M10 4.5v11"/><path d="M7.5 15.5h5"/>';
+
 const ICONS: Record<string, string> = {
+  text: TEXT_ICON,
   crop: CROP_ICON,
   eyedropper: EYEDROPPER_ICON,
   gradient: GRADIENT_ICON,

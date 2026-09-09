@@ -1,5 +1,6 @@
 import type { PixelDocument } from './document';
 import type { SelectionMask } from './selection';
+import type { TextLayerData } from './text-layer';
 import type { BlendMode, Layer, LayerType } from './types';
 
 /**
@@ -32,6 +33,7 @@ interface LayerRecord {
   readonly locked: boolean;
   readonly type: LayerType;
   readonly mask: HTMLCanvasElement | undefined;
+  readonly text: TextLayerData | undefined;
 }
 
 /** The layer list, layer properties and document size. No bitmaps are copied. */
@@ -100,6 +102,7 @@ export function captureDocument(doc: PixelDocument): DocumentSnapshot {
       locked: layer.locked,
       type: layer.type,
       mask: layer.mask,
+      text: layer.text,
     })),
   };
 }
@@ -130,6 +133,8 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
     layer.type = record.type;
     if (record.mask) layer.mask = record.mask;
     else delete layer.mask;
+    if (record.text) layer.text = record.text;
+    else delete layer.text;
 
     if (layer.canvas !== record.canvas) {
       const ctx = record.canvas.getContext('2d');
@@ -157,6 +162,7 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
     type: record.type,
   };
   if (record.mask) rebuilt.mask = record.mask;
+  if (record.text) rebuilt.text = record.text;
   return rebuilt;
 }
 
@@ -186,7 +192,8 @@ export function documentSnapshotsEqual(a: DocumentSnapshot, b: DocumentSnapshot)
       left.visible !== right.visible ||
       left.locked !== right.locked ||
       left.type !== right.type ||
-      left.mask !== right.mask
+      left.mask !== right.mask ||
+      left.text !== right.text
     ) {
       return false;
     }
