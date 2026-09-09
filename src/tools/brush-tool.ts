@@ -1,13 +1,17 @@
-import { canEditLayer } from '../core/layer-ops';
-import { captureLayerPixels, restoreLayerPixels } from '../core/snapshot';
-import { StrokeEngine } from '../core/stroke-engine';
-import type { BrushSettings } from '../core/stroke-engine';
-import { BLEND_MODES } from '../core/types';
+import { blendModeToComposite, BLEND_MODES } from '../core/types';
 import type { BlendMode, Layer, Point } from '../core/types';
-import type { OptionSpec, Tool, ToolContext, ToolPointer, ToolSample } from './types';
-
-const MIN_SIZE = 1;
-const MAX_SIZE = 2000;
+import {
+  beginStrokeSession,
+  commitStroke,
+  drawCursorOutline,
+  paintableLayer,
+  readBrushSettings,
+  stepBrushSize,
+  strokeOptions,
+  toBufferSample,
+} from './stroke-tool';
+import type { StrokeSession } from './stroke-tool';
+import type { OptionSpec, Tool, ToolContext, ToolPointer } from './types';
 
 function formatBlendMode(mode: BlendMode): string {
   return mode
@@ -16,132 +20,65 @@ function formatBlendMode(mode: BlendMode): string {
     .join(' ');
 }
 
-/** Options shared with the eraser and the other stroke tools. */
-export const BRUSH_OPTIONS: readonly OptionSpec[] = [
-  { type: 'number', id: 'size', label: 'Size', min: MIN_SIZE, max: MAX_SIZE, default: 24, unit: 'px' },
-  { type: 'slider', id: 'hardness', label: 'Hardness', min: 0, max: 100, default: 100, unit: '%' },
-  { type: 'slider', id: 'opacity', label: 'Opacity', min: 0, max: 100, default: 100, unit: '%' },
-  { type: 'slider', id: 'flow', label: 'Flow', min: 1, max: 100, default: 100, unit: '%' },
-  { type: 'slider', id: 'spacing', label: 'Spacing', min: 1, max: 100, default: 12, unit: '%' },
-  { type: 'slider', id: 'smoothing', label: 'Smoothing', min: 0, max: 100, default: 20, unit: '%' },
-  { type: 'checkbox', id: 'pressureSize', label: 'Pressure size', default: true },
-  { type: 'checkbox', id: 'pressureOpacity', label: 'Pressure opacity', default: false },
-  {
-    type: 'select',
-    id: 'blendMode',
-    label: 'Mode',
-    default: 'normal',
-    choices: BLEND_MODES.map((mode) => ({ value: mode, label: formatBlendMode(mode) })),
-  },
-];
-
-export function readBrushSettings(context: ToolContext, colour: string): BrushSettings {
-  const options = context.options;
-  return {
-    size: Math.min(Math.max(options.get<number>('size'), MIN_SIZE), MAX_SIZE),
-    hardness: options.get<number>('hardness') / 100,
-    flow: options.get<number>('flow') / 100,
-    spacing: options.get<number>('spacing') / 100,
-    smoothing: options.get<number>('smoothing') / 100,
-    pressureSize: options.get<boolean>('pressureSize'),
-    pressureOpacity: options.get<boolean>('pressureOpacity'),
-    colour,
-  };
-}
-
-/** Everything a stroke tool needs in flight, shared with the eraser later. */
-export interface StrokeSession {
-  readonly layer: Layer;
-  readonly buffer: HTMLCanvasElement;
-  readonly bufferCtx: CanvasRenderingContext2D;
-  readonly engine: StrokeEngine;
-}
-
-export function beginStrokeSession(layer: Layer, settings: BrushSettings): StrokeSession {
-  const buffer = document.createElement('canvas');
-  buffer.width = layer.canvas.width;
-  buffer.height = layer.canvas.height;
-
-  const bufferCtx = buffer.getContext('2d');
-  if (!bufferCtx) throw new Error('Could not acquire a 2D context for the stroke buffer.');
-
-  return { layer, buffer, bufferCtx, engine: new StrokeEngine(bufferCtx, settings) };
-}
-
-/** Restricts a finished stroke buffer to the active selection. */
-export function clipBufferToSelection(session: StrokeSession, context: ToolContext): void {
-  const selection = context.selection;
-  if (!selection) return;
-
-  const { bufferCtx, layer } = session;
-  bufferCtx.save();
-  bufferCtx.globalCompositeOperation = 'destination-in';
-  bufferCtx.drawImage(selection.canvas, -layer.x, -layer.y);
-  bufferCtx.restore();
-}
+export const BLEND_MODE_OPTION: OptionSpec = {
+  type: 'select',
+  id: 'blendMode',
+  label: 'Mode',
+  default: 'normal',
+  choices: BLEND_MODES.map((mode) => ({ value: mode, label: formatBlendMode(mode) })),
+};
 
 export function createBrushTool(): Tool {
   let session: StrokeSession | null = null;
   let hover: Point | null = null;
 
-  const settingsFor = (context: ToolContext): BrushSettings =>
-    readBrushSettings(context, context.colours.foreground);
+  const compositeOf = (context: ToolContext): GlobalCompositeOperation =>
+    blendModeToComposite(context.options.get<string>('blendMode') as BlendMode);
 
-  const toBuffer = (sample: ToolSample, layer: Layer) => ({
-    x: sample.doc.x - layer.x,
-    y: sample.doc.y - layer.y,
-    pressure: sample.pressure,
-  });
-
-  const showLive = (context: ToolContext): void => {
-    if (!session) return;
+  const showLive = (context: ToolContext, active: StrokeSession): void => {
     context.setLiveStroke({
-      layerId: session.layer.id,
-      canvas: session.buffer,
+      layerId: active.layer.id,
+      canvas: active.buffer,
       opacity: context.options.get<number>('opacity') / 100,
-      blendMode: context.options.get<string>('blendMode') as BlendMode,
+      composite: compositeOf(context),
     });
-  };
-
-  const cancel = (context: ToolContext): void => {
-    session = null;
-    context.setLiveStroke(null);
   };
 
   return {
     id: 'brush',
     name: 'Brush',
     shortcut: 'B',
-    // The ring is the cursor, so the pointer itself gets out of the way.
+    // The ring is the cursor, so the system pointer gets out of the way.
     cursor: 'none',
-    options: BRUSH_OPTIONS,
+    options: [...strokeOptions(), BLEND_MODE_OPTION],
 
     onPointerDown(context: ToolContext, pointer: ToolPointer): void {
-      const layer = context.activeLayer;
-      if (!canEditLayer(layer) || !layer) return;
+      const layer: Layer | null = paintableLayer(context);
+      if (!layer) return;
 
-      session = beginStrokeSession(layer, settingsFor(context));
-      session.engine.begin(toBuffer(pointer, layer));
-      showLive(context);
+      session = beginStrokeSession(layer, readBrushSettings(context, context.colours.foreground));
+      session.engine.begin(toBufferSample(pointer, layer));
+      showLive(context, session);
       context.invalidateComposite();
     },
 
     onPointerMove(context: ToolContext, pointer: ToolPointer): void {
       hover = pointer.doc;
 
-      if (!session) {
+      const active = session;
+      if (!active) {
         context.requestRender();
         return;
       }
 
-      session.engine.update(settingsFor(context));
-      // Consume every coalesced sample: a 240Hz stylus reports several per
-      // frame, and dropping them is what makes fast strokes look polygonal.
+      active.engine.update(readBrushSettings(context, context.colours.foreground));
+      // Consume every coalesced sample: a high-refresh stylus reports several
+      // per frame, and dropping them makes fast strokes look polygonal.
       for (const sample of pointer.coalesced) {
-        session.engine.extend(toBuffer(sample, session.layer));
+        active.engine.extend(toBufferSample(sample, active.layer));
       }
 
-      showLive(context);
+      showLive(context, active);
       context.invalidateComposite();
     },
 
@@ -151,77 +88,38 @@ export function createBrushTool(): Tool {
       session = null;
 
       active.engine.finish();
-      clipBufferToSelection(active, context);
-      context.setLiveStroke(null);
-
-      if (!active.engine.hasPainted) {
-        context.invalidateComposite();
-        return;
-      }
-
-      const layer = active.layer;
-      const doc = context.doc;
-      const before = captureLayerPixels(layer);
+      const opacity = Math.min(Math.max(context.options.get<number>('opacity') / 100, 0), 1);
+      const composite = compositeOf(context);
 
       // The buffer holds the whole stroke at full alpha, so opacity is applied
       // exactly once here. Stamping at opacity would darken self-overlaps.
-      layer.ctx.save();
-      layer.ctx.globalAlpha = Math.min(Math.max(context.options.get<number>('opacity') / 100, 0), 1);
-      layer.ctx.globalCompositeOperation =
-        context.options.get<string>('blendMode') === 'normal'
-          ? 'source-over'
-          : (context.options.get<string>('blendMode') as GlobalCompositeOperation);
-      layer.ctx.drawImage(active.buffer, 0, 0);
-      layer.ctx.restore();
-
-      const after = captureLayerPixels(layer);
-      context.history.push(
-        'Brush Stroke',
-        () => restoreLayerPixels(doc, before),
-        () => restoreLayerPixels(doc, after),
-      );
-      context.invalidateComposite();
+      commitStroke(context, active, 'Brush Stroke', (layerCtx, buffer) => {
+        layerCtx.save();
+        layerCtx.globalAlpha = opacity;
+        layerCtx.globalCompositeOperation = composite;
+        layerCtx.drawImage(buffer, 0, 0);
+        layerCtx.restore();
+      });
     },
 
     onKeyDown(context: ToolContext, event: KeyboardEvent): boolean {
       if (event.key !== '[' && event.key !== ']') return false;
-
-      const current = context.options.get<number>('size');
-      // Step proportionally so the shortcut stays useful at both extremes.
-      const delta = Math.max(1, Math.round(current * 0.1));
-      const next = event.key === ']' ? current + delta : current - delta;
-
-      context.options.set('size', Math.min(Math.max(next, MIN_SIZE), MAX_SIZE));
+      stepBrushSize(context, event.key === ']' ? 1 : -1);
       context.requestRender();
       return true;
     },
 
     drawOverlay(ctx: CanvasRenderingContext2D, context: ToolContext): void {
       if (!hover) return;
-
       const centre = context.viewport.docToScreen(hover.x, hover.y);
       const radius = (context.options.get<number>('size') / 2) * context.viewport.zoom;
-      if (radius < 0.5) return;
-
-      // Black under white, so the ring reads on any image beneath it.
-      ctx.save();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.beginPath();
-      ctx.arc(centre.x, centre.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.beginPath();
-      ctx.arc(centre.x, centre.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      drawCursorOutline(ctx, centre, radius, 'round');
     },
 
     deactivate(context: ToolContext): void {
       hover = null;
-      cancel(context);
+      session = null;
+      context.setLiveStroke(null);
     },
   };
 }

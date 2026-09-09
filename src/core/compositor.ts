@@ -1,5 +1,5 @@
 import type { PixelDocument } from './document';
-import type { BlendMode, Layer } from './types';
+import type { Layer } from './types';
 import { blendModeToComposite } from './types';
 
 /**
@@ -12,7 +12,11 @@ export interface LiveStroke {
   /** Buffer in the target layer's coordinate space, painted at full alpha. */
   readonly canvas: HTMLCanvasElement;
   readonly opacity: number;
-  readonly blendMode: BlendMode;
+  /**
+   * How the buffer joins the layer. Not a BlendMode: the eraser needs
+   * 'destination-out', which is a compositing operation rather than a blend.
+   */
+  readonly composite: GlobalCompositeOperation;
 }
 
 /**
@@ -136,14 +140,20 @@ export class Compositor {
    */
   private drawLayerWithStroke(layer: Layer, live: LiveStroke): void {
     const { ctx } = this;
-    const plain = layer.opacity >= 1 && layer.blendMode === 'normal';
+    // The fast path is only safe when the stroke lands on the layer exactly as
+    // it would on the composite. Any other compositing operation has to happen
+    // against the layer's own pixels, not against the layers underneath it.
+    const plain =
+      layer.opacity >= 1 &&
+      layer.blendMode === 'normal' &&
+      live.composite === 'source-over';
 
     if (plain) {
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(layer.canvas, layer.x, layer.y);
       ctx.globalAlpha = Math.min(Math.max(live.opacity, 0), 1);
-      ctx.globalCompositeOperation = blendModeToComposite(live.blendMode);
+      ctx.globalCompositeOperation = live.composite;
       ctx.drawImage(live.canvas, layer.x, layer.y);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
@@ -160,7 +170,7 @@ export class Compositor {
     scratchCtx.clearRect(0, 0, scratch.width, scratch.height);
     scratchCtx.drawImage(layer.canvas, 0, 0);
     scratchCtx.globalAlpha = Math.min(Math.max(live.opacity, 0), 1);
-    scratchCtx.globalCompositeOperation = blendModeToComposite(live.blendMode);
+    scratchCtx.globalCompositeOperation = live.composite;
     scratchCtx.drawImage(live.canvas, 0, 0);
     scratchCtx.globalAlpha = 1;
     scratchCtx.globalCompositeOperation = 'source-over';

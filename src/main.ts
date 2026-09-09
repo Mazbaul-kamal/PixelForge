@@ -13,6 +13,7 @@ import { History } from './core/history';
 import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
 import { createBrushTool } from './tools/brush-tool';
+import { createEraserTool } from './tools/eraser-tool';
 import { createHandTool } from './tools/hand-tool';
 import { createMoveTool } from './tools/move-tool';
 import { createZoomTool } from './tools/zoom-tool';
@@ -160,6 +161,7 @@ function boot(): void {
 
   toolManager.register(createMoveTool());
   toolManager.register(createBrushTool());
+  toolManager.register(createEraserTool());
   toolManager.register(createHandTool());
   toolManager.register(createZoomTool());
   // Holding Space borrows the Hand tool and springs back on release. Step 15

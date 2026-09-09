@@ -11,6 +11,8 @@ export interface BrushSettings {
   spacing: number;
   /** CSS colour of the paint. */
   colour: string;
+  /** Round dabs for brushes; square dabs for the block eraser. */
+  shape: 'round' | 'square';
   /** 0..1. 0 is raw input, 1 is heavily damped. */
   smoothing: number;
   pressureSize: boolean;
@@ -158,10 +160,19 @@ export class StrokeEngine {
     const { ctx } = this;
     ctx.save();
     ctx.globalAlpha = Math.min(alpha, 1);
-    ctx.fillStyle = this.dabGradient(sample, radius);
-    ctx.beginPath();
-    ctx.arc(sample.x, sample.y, radius, 0, Math.PI * 2);
-    ctx.fill();
+
+    if (this.settings.shape === 'square') {
+      // Snapped to whole pixels, which is the point of a block eraser.
+      const side = Math.max(1, Math.round(radius * 2));
+      ctx.fillStyle = this.settings.colour;
+      ctx.fillRect(Math.round(sample.x - side / 2), Math.round(sample.y - side / 2), side, side);
+    } else {
+      ctx.fillStyle = this.dabGradient(sample, radius);
+      ctx.beginPath();
+      ctx.arc(sample.x, sample.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.restore();
     this.painted = true;
   }
