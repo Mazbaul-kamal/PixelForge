@@ -91,16 +91,16 @@ export function toBufferSample(sample: ToolSample, layer: Layer) {
   return { x: sample.doc.x - layer.x, y: sample.doc.y - layer.y, pressure: sample.pressure };
 }
 
-/** Restricts a finished stroke buffer to the active selection. */
+/**
+ * Restricts a finished stroke buffer to the active selection.
+ *
+ * The buffer is the scratch surface SelectionMask.applyClip expects, so every
+ * painting tool ends up going through that one function.
+ */
 export function clipBufferToSelection(session: StrokeSession, context: ToolContext): void {
   const selection = context.selection;
   if (!selection) return;
-
-  const { bufferCtx, layer } = session;
-  bufferCtx.save();
-  bufferCtx.globalCompositeOperation = 'destination-in';
-  bufferCtx.drawImage(selection.canvas, -layer.x, -layer.y);
-  bufferCtx.restore();
+  selection.applyClip(session.bufferCtx, session.layer.x, session.layer.y);
 }
 
 /**

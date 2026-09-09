@@ -2,7 +2,8 @@ import type { ColourState } from '../core/colour-state';
 import type { PixelDocument } from '../core/document';
 import type { History } from '../core/history';
 import type { LiveStroke } from '../core/compositor';
-import type { Layer, Point, SelectionMask } from '../core/types';
+import type { SelectionMask } from '../core/selection';
+import type { Layer, Point } from '../core/types';
 import type { Viewport } from '../core/viewport';
 
 /** A declarative option. The options bar renders itself from these. */

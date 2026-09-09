@@ -13,6 +13,7 @@ import { History } from './core/history';
 import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
 import { createBrushTool } from './tools/brush-tool';
+import { createMarqueeTool } from './tools/marquee-tool';
 import { createEraserTool } from './tools/eraser-tool';
 import { createHandTool } from './tools/hand-tool';
 import { createMoveTool } from './tools/move-tool';
@@ -20,6 +21,7 @@ import { createZoomTool } from './tools/zoom-tool';
 import { ToolManager } from './tools/tool-manager';
 import { attachViewportNavigation } from './view/navigation';
 import { ViewRenderer } from './view/renderer';
+import { SelectionOverlay } from './view/selection-overlay';
 import { createAppShell } from './ui/shell';
 import { attachFileInput } from './ui/file-drop';
 import { FileActions } from './ui/file-actions';
@@ -29,6 +31,7 @@ import { ColourSwatches } from './ui/colour-swatches';
 import { NoticeStack } from './ui/notice';
 import { OptionsBar } from './ui/options-bar';
 import { ToolRail } from './ui/tool-rail';
+import { attachSelectionShortcuts } from './ui/selection-shortcuts';
 import { attachViewShortcuts } from './ui/view-shortcuts';
 import { UnsavedGuard } from './ui/unsaved-guard';
 import { attachLayerShortcuts } from './ui/layer-shortcuts';
@@ -157,9 +160,18 @@ function boot(): void {
     },
   });
 
-  renderer.setOverlayPainter((ctx) => toolManager.drawOverlay(ctx));
+  // Marching ants sit under the active tool's own overlay, and are drawn for
+  // every tool rather than only the selection tools.
+  const selectionOverlay = new SelectionOverlay(doc, viewport);
+  renderer.setOverlayPainter((ctx) => {
+    selectionOverlay.draw(ctx);
+    toolManager.drawOverlay(ctx);
+    // The ants animate, so keep asking for frames while a selection exists.
+    if (selectionOverlay.isAnimating) renderer.invalidate();
+  });
 
   toolManager.register(createMoveTool());
+  toolManager.register(createMarqueeTool());
   toolManager.register(createBrushTool());
   toolManager.register(createEraserTool());
   toolManager.register(createHandTool());
@@ -172,6 +184,7 @@ function boot(): void {
   new OptionsBar(shell.optionsBar, toolManager);
   new ColourSwatches(shell.toolRail, colours);
   attachColourShortcuts(colours);
+  attachSelectionShortcuts(doc, history, colours, documentChanged);
 
   statusBar.setDocumentSize(doc.width, doc.height);
   statusBar.setZoom(viewport.zoom);

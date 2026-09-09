@@ -12,7 +12,11 @@ const BRUSH_ICON =
 const ERASER_ICON =
   '<path d="m8.4 16.5-4-4a1.6 1.6 0 0 1 0-2.3l6.2-6.2a1.6 1.6 0 0 1 2.3 0l3.4 3.4a1.6 1.6 0 0 1 0 2.3l-6.8 6.8z"/><path d="M6.2 10.7 11.9 16.5"/><path d="M8.4 16.5H17"/>';
 
+const MARQUEE_ICON =
+  '<rect x="3" y="4.5" width="14" height="11" stroke-dasharray="3 2"/>';
+
 const ICONS: Record<string, string> = {
+  marquee: MARQUEE_ICON,
   brush: BRUSH_ICON,
   eraser: ERASER_ICON,
   move: MOVE_ICON,

@@ -1,5 +1,6 @@
 import type { PixelDocument } from './document';
-import type { BlendMode, Layer, LayerType, SelectionMask } from './types';
+import type { SelectionMask } from './selection';
+import type { BlendMode, Layer, LayerType } from './types';
 
 /**
  * Snapshots for the two history entry kinds.

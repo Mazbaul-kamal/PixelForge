@@ -6,7 +6,8 @@ import { captureLayerPixels, restoreLayerPixels } from '../core/snapshot';
 import type { PixelSnapshot } from '../core/snapshot';
 import { collectSnapTargets, computeSnap, layerRect } from '../core/snapping';
 import type { Guide } from '../core/snapping';
-import type { Layer, Point, SelectionMask } from '../core/types';
+import type { SelectionMask } from '../core/selection';
+import type { Layer, Point } from '../core/types';
 import type { Tool, ToolContext, ToolPointer } from './types';
 
 /** Screen pixels within which an edge is considered aligned. */
@@ -91,7 +92,7 @@ export function createMoveTool(): Tool {
 
   /** Lifts the selected pixels out of the layer so they can be dragged. */
   const beginFloat = (layer: Layer, selection: SelectionMask): FloatingRegion => {
-    const bounds = selection.bounds;
+    const bounds = selection.bounds();
     const before = captureLayerPixels(layer);
 
     const canvas = document.createElement('canvas');

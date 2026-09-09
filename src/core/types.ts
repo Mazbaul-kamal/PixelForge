@@ -61,17 +61,6 @@ export interface Point {
   y: number;
 }
 
-/**
- * A document-sized coverage mask produced by the selection engine.
- * Declared here so `PixelDocument.selection` has its final type from the start.
- */
-export interface SelectionMask {
-  /** Document-sized canvas whose alpha channel is the selection coverage. */
-  readonly canvas: HTMLCanvasElement;
-  /** Tight bounds of the non-zero coverage, in document coordinates. */
-  readonly bounds: Rect;
-}
-
 export interface Layer {
   readonly id: string;
   name: string;

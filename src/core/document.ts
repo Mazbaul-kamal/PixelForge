@@ -1,4 +1,5 @@
-import type { Layer, SelectionMask } from './types';
+import type { SelectionMask } from './selection';
+import type { Layer } from './types';
 
 /**
  * The document model. `layers[0]` is the BOTTOM layer, so the layers panel and
