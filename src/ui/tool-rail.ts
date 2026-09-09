@@ -24,7 +24,11 @@ const POLYGON_LASSO_ICON =
 const WAND_ICON =
   '<path d="M4 16 13.5 6.5"/><path d="m12 5 3 3"/><path d="M15.5 3v2.4M17.6 5.1l-1.4 1.4M18.8 8.6h-2.4"/>';
 
+const BUCKET_ICON =
+  '<path d="M8.2 3.2 16 11a1.4 1.4 0 0 1 0 2l-4.6 4.6a1.4 1.4 0 0 1-2 0L3.6 11.8a1.4 1.4 0 0 1 0-2L8.2 5.2z"/><path d="M3 11.5h13"/><path d="M17.5 13.5c.9 1.3 1.5 2.2 1.5 3a1.5 1.5 0 0 1-3 0c0-.8.6-1.7 1.5-3z"/>';
+
 const ICONS: Record<string, string> = {
+  bucket: BUCKET_ICON,
   'magic-wand': WAND_ICON,
   marquee: MARQUEE_ICON,
   'ellipse-marquee': ELLIPSE_ICON,

@@ -13,10 +13,14 @@ import { History } from './core/history';
 import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
 import { createBrushTool } from './tools/brush-tool';
+import { fillThroughMasks, patternPaint, solidPaint } from './core/fill-ops';
 import { FloodRunner } from './core/flood-runner';
+import { builtInPatterns, patternFromSelection } from './core/patterns';
+import type { PatternDefinition } from './core/patterns';
 import { SelectionMask } from './core/selection';
 import { deselect, invertSelection, selectAll, setSelection } from './core/selection-ops';
 import { createLassoTool } from './tools/lasso-tool';
+import { createBucketTool } from './tools/bucket-tool';
 import { createMagicWandTool } from './tools/magic-wand-tool';
 import { createMarqueeTool } from './tools/marquee-tool';
 import { createPolygonLassoTool } from './tools/polygon-lasso-tool';
@@ -35,6 +39,7 @@ import { buildMenuBar } from './ui/menubar';
 import { attachColourShortcuts } from './ui/colour-shortcuts';
 import { ColourSwatches } from './ui/colour-swatches';
 import { BusyIndicator } from './ui/busy-indicator';
+import { openFillDialog } from './ui/dialogs/fill-dialog';
 import { NoticeStack } from './ui/notice';
 import { OptionsBar } from './ui/options-bar';
 import { ToolRail } from './ui/tool-rail';
@@ -149,30 +154,16 @@ function boot(): void {
     });
   };
 
-  buildMenuBar(shell.menuBar, [
-    {
-      label: 'File',
-      items: [
-        { label: 'New…', shortcut: 'Ctrl+N', run: () => fileActions.newDocument() },
-        { label: 'Open…', shortcut: 'Ctrl+O', run: () => fileActions.chooseFiles() },
-        { label: 'Export As…', shortcut: 'Ctrl+Shift+S', run: () => fileActions.exportImage() },
-      ],
-    },
-    {
-      label: 'Select',
-      items: [
-        { label: 'All', shortcut: 'Ctrl+A', run: () => { selectAll(doc, history); documentChanged(); } },
-        { label: 'Deselect', shortcut: 'Ctrl+D', run: () => { deselect(doc, history); documentChanged(); } },
-        { label: 'Inverse', shortcut: 'Ctrl+Shift+I', run: () => { invertSelection(doc, history); documentChanged(); } },
-        { label: 'Grow', run: () => rescanSelection('grow') },
-        { label: 'Similar', run: () => rescanSelection('similar') },
-      ],
-    },
-  ]);
+
 
   attachFileInput(shell.stage, fileActions);
 
   window.addEventListener('keydown', (event) => {
+    if (event.key === 'F5' && event.shiftKey) {
+      event.preventDefault();
+      runFillCommand();
+      return;
+    }
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     const key = event.key.toLowerCase();
 
@@ -246,6 +237,74 @@ function boot(): void {
   const floodRunner = new FloodRunner();
   const track = <T,>(label: string, work: Promise<T>): Promise<T> => busy.during(label, work);
   toolManager.register(createMagicWandTool({ runner: floodRunner, track }));
+
+  // Patterns are the built-in tiles plus anything defined from a selection.
+  const patterns: PatternDefinition[] = builtInPatterns();
+  const listPatterns = (): readonly PatternDefinition[] => patterns;
+
+  toolManager.register(
+    createBucketTool({
+      runner: floodRunner,
+      track,
+      patterns: listPatterns,
+      onFilled: () => {
+        thumbnails.markAllDirty();
+        documentChanged();
+      },
+    }),
+  );
+
+  /** Shift+F5 and Edit > Fill. */
+  const runFillCommand = (): void => {
+    const layer = doc.getActiveLayer();
+    if (!layer) return;
+
+    openFillDialog(
+      patterns.map((entry) => ({ id: entry.id, name: entry.name })),
+      (request) => {
+        const tile =
+          request.source === 'pattern'
+            ? patterns.find((entry) => entry.id === request.patternId) ?? patterns[0]
+            : null;
+
+        const colour =
+          request.source === 'background'
+            ? colours.background
+            : request.source === 'custom'
+              ? request.colour
+              : colours.foreground;
+
+        const paint = tile ? patternPaint(tile.canvas) : solidPaint(colour);
+        fillThroughMasks(
+          doc, history, layer, paint, [doc.selection],
+          { opacity: request.opacity, blendMode: request.blendMode },
+          'Fill',
+        );
+        thumbnails.markAllDirty();
+        documentChanged();
+      },
+    );
+  };
+
+  /** Turns the current selection into a reusable pattern tile. */
+  const definePattern = (): void => {
+    const selection = doc.selection;
+    if (!selection) {
+      notices.show('Select an area first.', 'Define Pattern uses the current selection as the tile.');
+      return;
+    }
+    compositor.composeIfDirty();
+    const defined = patternFromSelection(doc, selection, compositor.canvas);
+    if (!defined) return;
+
+    // One custom pattern at a time, kept under a stable id the option refers to.
+    const custom: PatternDefinition = { ...defined, id: 'custom', name: 'From selection' };
+    const existing = patterns.findIndex((entry) => entry.id === 'custom');
+    if (existing >= 0) patterns[existing] = custom;
+    else patterns.push(custom);
+
+    notices.show(`Pattern defined (${custom.canvas.width} × ${custom.canvas.height}).`);
+  };
   toolManager.register(createBrushTool());
   toolManager.register(createEraserTool());
   toolManager.register(createHandTool());
@@ -277,6 +336,34 @@ function boot(): void {
     });
     waitForSize.observe(shell.stage);
   }
+
+  buildMenuBar(shell.menuBar, [
+    {
+      label: 'File',
+      items: [
+        { label: 'New…', shortcut: 'Ctrl+N', run: () => fileActions.newDocument() },
+        { label: 'Open…', shortcut: 'Ctrl+O', run: () => fileActions.chooseFiles() },
+        { label: 'Export As…', shortcut: 'Ctrl+Shift+S', run: () => fileActions.exportImage() },
+      ],
+    },
+    {
+      label: 'Edit',
+      items: [
+        { label: 'Fill…', shortcut: 'Shift+F5', run: runFillCommand },
+        { label: 'Define Pattern', run: definePattern },
+      ],
+    },
+    {
+      label: 'Select',
+      items: [
+        { label: 'All', shortcut: 'Ctrl+A', run: () => { selectAll(doc, history); documentChanged(); } },
+        { label: 'Deselect', shortcut: 'Ctrl+D', run: () => { deselect(doc, history); documentChanged(); } },
+        { label: 'Inverse', shortcut: 'Ctrl+Shift+I', run: () => { invertSelection(doc, history); documentChanged(); } },
+        { label: 'Grow', run: () => rescanSelection('grow') },
+        { label: 'Similar', run: () => rescanSelection('similar') },
+      ],
+    },
+  ]);
 
   renderer.start();
 }
