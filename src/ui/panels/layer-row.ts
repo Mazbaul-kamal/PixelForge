@@ -22,6 +22,8 @@ export interface LayerRowCallbacks {
   onToggleLock: (id: string) => void;
   onPick: (id: string, event: MouseEvent) => void;
   onRename: (id: string, name: string) => void;
+  /** Ctrl or Cmd click on the thumbnail, which loads the layer as a selection. */
+  onLoadSelection: (id: string) => void;
 }
 
 export interface LayerRowState {
@@ -64,6 +66,12 @@ export class LayerRow {
 
     this.thumbHost = document.createElement('div');
     this.thumbHost.className = 'pf-layer-thumb';
+    this.thumbHost.title = 'Ctrl+click to load as a selection';
+    this.thumbHost.addEventListener('click', (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.stopPropagation();
+      callbacks.onLoadSelection(this.id);
+    });
 
     const meta = document.createElement('div');
     meta.className = 'pf-layer-meta';

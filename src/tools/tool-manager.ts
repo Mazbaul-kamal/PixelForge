@@ -306,12 +306,13 @@ export class ToolManager {
         return;
       }
 
-      for (const tool of this.registered) {
-        if (tool.shortcut.toLowerCase() === key) {
-          this.setActiveTool(tool.id);
-          event.preventDefault();
-          return;
-        }
+      // Several tools can share a shortcut; pressing it cycles through them.
+      const matches = this.registered.filter((tool) => tool.shortcut.toLowerCase() === key);
+      if (matches.length > 0) {
+        const currentIndex = matches.findIndex((tool) => tool.id === this.active?.id);
+        const next = matches[(currentIndex + 1) % matches.length];
+        if (next) this.setActiveTool(next.id);
+        event.preventDefault();
       }
     };
 

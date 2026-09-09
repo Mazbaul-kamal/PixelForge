@@ -12,6 +12,7 @@ import {
   setLayerLocked,
   setLayerVisibility,
 } from '../../core/layer-ops';
+import { selectLayerAlpha } from '../../core/selection-ops';
 import { BLEND_MODES } from '../../core/types';
 import type { BlendMode, Layer } from '../../core/types';
 import { attachDragReorder } from '../drag-reorder';
@@ -416,6 +417,10 @@ export class LayersPanel {
               },
               onPick: (id, event) => this.pick(id, event),
               onRename: (id, name) => renameLayer(this.doc, this.history, id, name),
+              onLoadSelection: (id) => {
+                selectLayerAlpha(this.doc, this.history, id);
+                this.onChanged();
+              },
             }),
           );
         }

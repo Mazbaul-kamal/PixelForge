@@ -13,7 +13,9 @@ import { History } from './core/history';
 import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
 import { createBrushTool } from './tools/brush-tool';
+import { createLassoTool } from './tools/lasso-tool';
 import { createMarqueeTool } from './tools/marquee-tool';
+import { createPolygonLassoTool } from './tools/polygon-lasso-tool';
 import { createEraserTool } from './tools/eraser-tool';
 import { createHandTool } from './tools/hand-tool';
 import { createMoveTool } from './tools/move-tool';
@@ -171,7 +173,10 @@ function boot(): void {
   });
 
   toolManager.register(createMoveTool());
-  toolManager.register(createMarqueeTool());
+  toolManager.register(createMarqueeTool('rectangle'));
+  toolManager.register(createMarqueeTool('ellipse'));
+  toolManager.register(createLassoTool());
+  toolManager.register(createPolygonLassoTool());
   toolManager.register(createBrushTool());
   toolManager.register(createEraserTool());
   toolManager.register(createHandTool());

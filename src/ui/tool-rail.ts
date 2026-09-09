@@ -15,8 +15,17 @@ const ERASER_ICON =
 const MARQUEE_ICON =
   '<rect x="3" y="4.5" width="14" height="11" stroke-dasharray="3 2"/>';
 
+const ELLIPSE_ICON = '<ellipse cx="10" cy="10" rx="7" ry="5.5" stroke-dasharray="3 2"/>';
+const LASSO_ICON =
+  '<path d="M10 3.4c3.9 0 7 2.1 7 4.8s-3.1 4.8-7 4.8c-2.4 0-4.5-.8-5.8-2"/><path d="M4.2 11c-.9.9-1.2 2-.7 2.8.6.9 2 1 3 .3"/><circle cx="6.5" cy="15.6" r="1.4"/>';
+const POLYGON_LASSO_ICON =
+  '<path d="M3.5 8.5 9 3.8l7.2 3.4-2.4 6.4-6.6 1.1z" stroke-dasharray="3 2"/>';
+
 const ICONS: Record<string, string> = {
   marquee: MARQUEE_ICON,
+  'ellipse-marquee': ELLIPSE_ICON,
+  lasso: LASSO_ICON,
+  'polygon-lasso': POLYGON_LASSO_ICON,
   brush: BRUSH_ICON,
   eraser: ERASER_ICON,
   move: MOVE_ICON,

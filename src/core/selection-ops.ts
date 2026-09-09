@@ -2,6 +2,7 @@ import type { PixelDocument } from './document';
 import type { History } from './history';
 import { canEditLayer } from './layer-ops';
 import { SelectionMask } from './selection';
+import type { Layer } from './types';
 import { captureLayerPixels, restoreLayerPixels } from './snapshot';
 
 /** Replaces the document selection as one undoable step. */
@@ -116,5 +117,26 @@ export function fillSelection(
     () => restoreLayerPixels(doc, before),
     () => restoreLayerPixels(doc, after),
   );
+  return true;
+}
+
+/** Builds a selection from a layer's own alpha channel, placed in document space. */
+export function maskFromLayerAlpha(doc: PixelDocument, layer: Layer): SelectionMask {
+  return SelectionMask.fromShape(
+    doc.width,
+    doc.height,
+    (ctx) => ctx.drawImage(layer.canvas, layer.x, layer.y),
+  );
+}
+
+/** Ctrl+clicking a layer thumbnail loads that layer's shape as a selection. */
+export function selectLayerAlpha(
+  doc: PixelDocument,
+  history: History,
+  layerId: string,
+): boolean {
+  const layer = doc.getLayer(layerId);
+  if (!layer) return false;
+  setSelection(doc, history, maskFromLayerAlpha(doc, layer), 'Load Layer Selection');
   return true;
 }
