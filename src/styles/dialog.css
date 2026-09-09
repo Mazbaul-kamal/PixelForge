@@ -124,3 +124,75 @@
 .pf-unit {
   color: var(--pf-text-dim);
 }
+
+/* ---- gradient editor ---- */
+.pf-gradient-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 320px;
+}
+
+.pf-gradient-preview {
+  display: block;
+  width: 320px;
+  height: 44px;
+  border: 1px solid var(--pf-line-strong);
+}
+
+.pf-stop-strip {
+  position: relative;
+  height: 18px;
+  cursor: copy;
+}
+
+.pf-stop {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin-left: -6px;
+  padding: 0;
+  background: var(--stop-colour, #ffffff);
+  border: 1px solid var(--pf-text);
+  cursor: grab;
+}
+
+.pf-stop--colour {
+  top: 2px;
+  border-radius: 0 0 2px 2px;
+}
+
+.pf-stop--opacity {
+  bottom: 2px;
+  border-radius: 2px 2px 0 0;
+}
+
+.pf-stop--midpoint {
+  top: 4px;
+  width: 7px;
+  height: 7px;
+  margin-left: -4px;
+  background: var(--pf-text-dim);
+  border-color: var(--pf-bg-sunken);
+  transform: rotate(45deg);
+}
+
+.pf-stop.is-selected {
+  outline: 2px solid var(--pf-accent);
+  outline-offset: 1px;
+}
+
+.pf-stop.is-removing {
+  opacity: 0.35;
+}
+
+.pf-gradient-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pf-gradient-controls .pf-range {
+  flex: 1;
+}

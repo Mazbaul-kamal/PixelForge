@@ -15,12 +15,15 @@ import { Viewport } from './core/viewport';
 import { createBrushTool } from './tools/brush-tool';
 import { fillThroughMasks, patternPaint, solidPaint } from './core/fill-ops';
 import { FloodRunner } from './core/flood-runner';
+import { cloneGradient, gradientPresets } from './core/gradient';
+import type { GradientDefinition } from './core/gradient';
 import { builtInPatterns, patternFromSelection } from './core/patterns';
 import type { PatternDefinition } from './core/patterns';
 import { SelectionMask } from './core/selection';
 import { deselect, invertSelection, selectAll, setSelection } from './core/selection-ops';
 import { createLassoTool } from './tools/lasso-tool';
 import { createBucketTool } from './tools/bucket-tool';
+import { createGradientTool } from './tools/gradient-tool';
 import { createMagicWandTool } from './tools/magic-wand-tool';
 import { createMarqueeTool } from './tools/marquee-tool';
 import { createPolygonLassoTool } from './tools/polygon-lasso-tool';
@@ -40,6 +43,7 @@ import { attachColourShortcuts } from './ui/colour-shortcuts';
 import { ColourSwatches } from './ui/colour-swatches';
 import { BusyIndicator } from './ui/busy-indicator';
 import { openFillDialog } from './ui/dialogs/fill-dialog';
+import { openGradientEditor } from './ui/dialogs/gradient-editor';
 import { NoticeStack } from './ui/notice';
 import { OptionsBar } from './ui/options-bar';
 import { ToolRail } from './ui/tool-rail';
@@ -253,6 +257,33 @@ function boot(): void {
       },
     }),
   );
+
+  // The gradient in the options bar's preset dropdown, editable in the dialog.
+  const presets = gradientPresets();
+  let activeGradient: GradientDefinition = cloneGradient(presets[0]!);
+
+  const gradientTool = createGradientTool({
+    current: () => activeGradient,
+    openEditor: () =>
+      openGradientEditor(activeGradient, colours, (next) => {
+        activeGradient = next;
+      }),
+    onFilled: () => {
+      thumbnails.markAllDirty();
+      documentChanged();
+    },
+  });
+  toolManager.register(gradientTool);
+
+  // Choosing a preset replaces the working gradient.
+  toolManager.context.options.subscribe(() => {
+    if (toolManager.activeTool?.id !== 'gradient') return;
+    const wanted = toolManager.context.options.get<string>('preset');
+    if (wanted !== activeGradient.id) {
+      const found = presets.find((entry) => entry.id === wanted);
+      if (found) activeGradient = cloneGradient(found);
+    }
+  });
 
   /** Shift+F5 and Edit > Fill. */
   const runFillCommand = (): void => {

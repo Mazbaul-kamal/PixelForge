@@ -27,7 +27,11 @@ const WAND_ICON =
 const BUCKET_ICON =
   '<path d="M8.2 3.2 16 11a1.4 1.4 0 0 1 0 2l-4.6 4.6a1.4 1.4 0 0 1-2 0L3.6 11.8a1.4 1.4 0 0 1 0-2L8.2 5.2z"/><path d="M3 11.5h13"/><path d="M17.5 13.5c.9 1.3 1.5 2.2 1.5 3a1.5 1.5 0 0 1-3 0c0-.8.6-1.7 1.5-3z"/>';
 
+const GRADIENT_ICON =
+  '<rect x="3" y="4.5" width="14" height="11"/><path d="M4 14.5 16 5.5" stroke-opacity="0.25"/><path d="M4 11.5 16 5.5" stroke-opacity="0.5"/><path d="M4 8.5 13 5.5" stroke-opacity="0.8"/>';
+
 const ICONS: Record<string, string> = {
+  gradient: GRADIENT_ICON,
   bucket: BUCKET_ICON,
   'magic-wand': WAND_ICON,
   marquee: MARQUEE_ICON,
