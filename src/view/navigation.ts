@@ -105,9 +105,9 @@ export function attachViewportNavigation(
       return;
     }
 
-    const isMiddleDrag = event.pointerType !== 'touch' && event.button === 1;
-    const isTouchDrag = event.pointerType === 'touch' && touches.length === 1;
-    if (!isMiddleDrag && !isTouchDrag) return;
+    // A single pointer belongs to the active tool; navigation only claims the
+    // middle button and two-finger gestures.
+    if (event.pointerType === 'touch' || event.button !== 1) return;
 
     event.preventDefault();
     surface.setPointerCapture(event.pointerId);
@@ -157,15 +157,7 @@ export function attachViewportNavigation(
       beginPinch(touches);
     } else {
       pinchDistance = 0;
-      if (touches.length === 1) {
-        const remaining = touches[0];
-        if (remaining) {
-          panning = true;
-          lastPan = { x: remaining.x, y: remaining.y };
-        }
-      } else {
-        panning = false;
-      }
+      panning = false;
     }
 
     if (event.pointerType === 'touch') reportPointer(null);

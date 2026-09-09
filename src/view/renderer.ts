@@ -23,6 +23,7 @@ export class ViewRenderer {
   private checkerDpr = 0;
   private needsRedraw = true;
   private frame = 0;
+  private overlay: ((ctx: CanvasRenderingContext2D) => void) | null = null;
 
   private checkerA = '#cfcfcf';
   private checkerB = '#f2f2f2';
@@ -58,6 +59,15 @@ export class ViewRenderer {
   invalidate = (): void => {
     this.needsRedraw = true;
   };
+
+  /**
+   * Registers the painter drawn last, on top of everything. Tools reach the
+   * screen only through here; nothing else may touch the view canvas.
+   */
+  setOverlayPainter(painter: ((ctx: CanvasRenderingContext2D) => void) | null): void {
+    this.overlay = painter;
+    this.needsRedraw = true;
+  }
 
   start(): void {
     if (this.frame !== 0) return;
@@ -161,6 +171,22 @@ export class ViewRenderer {
     ctx.lineWidth = 1;
     ctx.strokeStyle = this.docBorder;
     ctx.strokeRect(left, top, right - left, bottom - top);
+
+    this.drawOverlay();
+  }
+
+  /** Tool overlays run last, in CSS pixel space so 1px strokes stay 1px. */
+  private drawOverlay(): void {
+    if (!this.overlay) return;
+
+    const { ctx } = this;
+    ctx.save();
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    try {
+      this.overlay(ctx);
+    } finally {
+      ctx.restore();
+    }
   }
 
   private ensureChecker(): void {

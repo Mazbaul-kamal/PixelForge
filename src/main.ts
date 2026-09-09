@@ -4,19 +4,27 @@ import './styles/panels.css';
 import './styles/layers.css';
 import './styles/chrome.css';
 import './styles/dialog.css';
+import './styles/tools.css';
 
+import { ColourState } from './core/colour-state';
 import { Compositor } from './core/compositor';
 import { PixelDocument } from './core/document';
 import { History } from './core/history';
 import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
+import { createHandTool } from './tools/hand-tool';
+import { ToolManager } from './tools/tool-manager';
 import { attachViewportNavigation } from './view/navigation';
 import { ViewRenderer } from './view/renderer';
 import { createAppShell } from './ui/shell';
 import { attachFileInput } from './ui/file-drop';
 import { FileActions } from './ui/file-actions';
 import { buildMenuBar } from './ui/menubar';
+import { attachColourShortcuts } from './ui/colour-shortcuts';
+import { ColourSwatches } from './ui/colour-swatches';
 import { NoticeStack } from './ui/notice';
+import { OptionsBar } from './ui/options-bar';
+import { ToolRail } from './ui/tool-rail';
 import { UnsavedGuard } from './ui/unsaved-guard';
 import { attachLayerShortcuts } from './ui/layer-shortcuts';
 import { HistoryPanel } from './ui/panels/history-panel';
@@ -121,6 +129,30 @@ function boot(): void {
   attachViewportNavigation(renderer.canvas, viewport, doc, {
     onPointerPosition: (point) => statusBar.setPointer(point),
   });
+
+  // ---- tools ----
+  const colours = new ColourState();
+  const toolManager = new ToolManager({
+    surface: renderer.canvas,
+    doc,
+    history,
+    viewport,
+    colours,
+    requestRender: renderer.invalidate,
+    invalidateComposite: documentChanged,
+  });
+
+  renderer.setOverlayPainter((ctx) => toolManager.drawOverlay(ctx));
+
+  toolManager.register(createHandTool());
+  // Holding Space borrows the Hand tool and springs back on release. Step 15
+  // registers Alt for the Eyedropper the same way, once that tool exists.
+  toolManager.registerTemporaryOverride('space', 'hand');
+
+  new ToolRail(shell.toolRail, toolManager);
+  new OptionsBar(shell.optionsBar, toolManager);
+  new ColourSwatches(shell.toolRail, colours);
+  attachColourShortcuts(colours);
 
   statusBar.setDocumentSize(doc.width, doc.height);
   statusBar.setZoom(viewport.zoom);

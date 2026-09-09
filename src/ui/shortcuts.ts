@@ -1,14 +1,5 @@
 import type { History } from '../core/history';
-
-function isTextEntry(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target instanceof HTMLTextAreaElement) return true;
-  if (target instanceof HTMLInputElement) {
-    return !['range', 'checkbox', 'radio', 'button', 'color'].includes(target.type);
-  }
-  return false;
-}
+import { isTextEntry } from './keyboard';
 
 /** Ctrl+Z undo, Ctrl+Shift+Z or Ctrl+Y redo. Native undo wins inside text fields. */
 export function attachHistoryShortcuts(history: History): () => void {
