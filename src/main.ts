@@ -13,7 +13,11 @@ import { History } from './core/history';
 import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
 import { createBrushTool } from './tools/brush-tool';
+import { FloodRunner } from './core/flood-runner';
+import { SelectionMask } from './core/selection';
+import { deselect, invertSelection, selectAll, setSelection } from './core/selection-ops';
 import { createLassoTool } from './tools/lasso-tool';
+import { createMagicWandTool } from './tools/magic-wand-tool';
 import { createMarqueeTool } from './tools/marquee-tool';
 import { createPolygonLassoTool } from './tools/polygon-lasso-tool';
 import { createEraserTool } from './tools/eraser-tool';
@@ -30,6 +34,7 @@ import { FileActions } from './ui/file-actions';
 import { buildMenuBar } from './ui/menubar';
 import { attachColourShortcuts } from './ui/colour-shortcuts';
 import { ColourSwatches } from './ui/colour-swatches';
+import { BusyIndicator } from './ui/busy-indicator';
 import { NoticeStack } from './ui/notice';
 import { OptionsBar } from './ui/options-bar';
 import { ToolRail } from './ui/tool-rail';
@@ -116,6 +121,34 @@ function boot(): void {
     onSaved: () => unsavedGuard.markSaved(),
   });
 
+  /** Grow and Similar both rescan the image against the current selection. */
+  const rescanSelection = (kind: 'grow' | 'similar'): void => {
+    const current = doc.selection;
+    if (!current) {
+      notices.show('Select something first.', 'Grow and Similar work from an existing selection.');
+      return;
+    }
+
+    const source = readSourcePixels(true);
+    if (!source) return;
+
+    const scan = floodRunner.run({
+      kind,
+      pixels: source.data,
+      width: source.width,
+      height: source.height,
+      tolerance: 30,
+      antiAlias: true,
+      seeds: current.data,
+    });
+
+    void track(kind === 'grow' ? 'Growing…' : 'Finding similar…', scan).then((data) => {
+      setSelection(doc, history, new SelectionMask(doc.width, doc.height, data),
+        kind === 'grow' ? 'Grow Selection' : 'Select Similar');
+      documentChanged();
+    });
+  };
+
   buildMenuBar(shell.menuBar, [
     {
       label: 'File',
@@ -123,6 +156,16 @@ function boot(): void {
         { label: 'New…', shortcut: 'Ctrl+N', run: () => fileActions.newDocument() },
         { label: 'Open…', shortcut: 'Ctrl+O', run: () => fileActions.chooseFiles() },
         { label: 'Export As…', shortcut: 'Ctrl+Shift+S', run: () => fileActions.exportImage() },
+      ],
+    },
+    {
+      label: 'Select',
+      items: [
+        { label: 'All', shortcut: 'Ctrl+A', run: () => { selectAll(doc, history); documentChanged(); } },
+        { label: 'Deselect', shortcut: 'Ctrl+D', run: () => { deselect(doc, history); documentChanged(); } },
+        { label: 'Inverse', shortcut: 'Ctrl+Shift+I', run: () => { invertSelection(doc, history); documentChanged(); } },
+        { label: 'Grow', run: () => rescanSelection('grow') },
+        { label: 'Similar', run: () => rescanSelection('similar') },
       ],
     },
   ]);
@@ -148,6 +191,26 @@ function boot(): void {
 
   // ---- tools ----
   const colours = new ColourState();
+
+  /** Document-sized pixels for the wand and the bucket to match against. */
+  const readSourcePixels = (allLayers: boolean): ImageData | null => {
+    if (allLayers) {
+      compositor.composeIfDirty();
+      return compositor.ctx.getImageData(0, 0, doc.width, doc.height);
+    }
+
+    const layer = doc.getActiveLayer();
+    if (!layer) return null;
+
+    const scratch = document.createElement('canvas');
+    scratch.width = doc.width;
+    scratch.height = doc.height;
+    const scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
+    if (!scratchCtx) return null;
+
+    scratchCtx.drawImage(layer.canvas, layer.x, layer.y);
+    return scratchCtx.getImageData(0, 0, doc.width, doc.height);
+  };
   const toolManager = new ToolManager({
     surface: renderer.canvas,
     doc,
@@ -160,6 +223,7 @@ function boot(): void {
       compositor.setLiveStroke(stroke);
       renderer.invalidate();
     },
+    readSourcePixels: (allLayers) => readSourcePixels(allLayers),
   });
 
   // Marching ants sit under the active tool's own overlay, and are drawn for
@@ -177,6 +241,11 @@ function boot(): void {
   toolManager.register(createMarqueeTool('ellipse'));
   toolManager.register(createLassoTool());
   toolManager.register(createPolygonLassoTool());
+
+  const busy = new BusyIndicator(document.body);
+  const floodRunner = new FloodRunner();
+  const track = <T,>(label: string, work: Promise<T>): Promise<T> => busy.during(label, work);
+  toolManager.register(createMagicWandTool({ runner: floodRunner, track }));
   toolManager.register(createBrushTool());
   toolManager.register(createEraserTool());
   toolManager.register(createHandTool());

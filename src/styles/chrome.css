@@ -152,3 +152,17 @@
   color: var(--pf-text);
   background: rgba(255, 255, 255, 0.08);
 }
+
+.pf-busy {
+  position: fixed;
+  left: 50%;
+  top: 74px;
+  z-index: 70;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  color: var(--pf-text);
+  background: var(--pf-bg-panel);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 4px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+}

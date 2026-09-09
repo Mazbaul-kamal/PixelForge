@@ -21,7 +21,11 @@ const LASSO_ICON =
 const POLYGON_LASSO_ICON =
   '<path d="M3.5 8.5 9 3.8l7.2 3.4-2.4 6.4-6.6 1.1z" stroke-dasharray="3 2"/>';
 
+const WAND_ICON =
+  '<path d="M4 16 13.5 6.5"/><path d="m12 5 3 3"/><path d="M15.5 3v2.4M17.6 5.1l-1.4 1.4M18.8 8.6h-2.4"/>';
+
 const ICONS: Record<string, string> = {
+  'magic-wand': WAND_ICON,
   marquee: MARQUEE_ICON,
   'ellipse-marquee': ELLIPSE_ICON,
   lasso: LASSO_ICON,

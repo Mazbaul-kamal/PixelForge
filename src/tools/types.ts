@@ -104,6 +104,11 @@ export interface ToolContext {
   setLiveStroke(stroke: LiveStroke | null): void;
   /** Temporarily override the tool's cursor, e.g. while dragging. */
   setCursor(cursor: string | null): void;
+  /**
+   * Document-sized pixels to sample from: the whole composite, or just the
+   * active layer placed at its offset. Used by the wand and the bucket.
+   */
+  readSourcePixels(allLayers: boolean): ImageData | null;
 }
 
 export interface Tool {

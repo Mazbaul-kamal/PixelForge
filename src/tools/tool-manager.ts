@@ -17,6 +17,7 @@ export interface ToolManagerDeps {
   requestRender: () => void;
   invalidateComposite: () => void;
   setLiveStroke: (stroke: LiveStroke | null) => void;
+  readSourcePixels: (allLayers: boolean) => ImageData | null;
 }
 
 function defaultsOf(specs: readonly OptionSpec[]): Map<string, unknown> {
@@ -85,6 +86,7 @@ export class ToolManager {
       requestRender: deps.requestRender,
       invalidateComposite: deps.invalidateComposite,
       setLiveStroke: deps.setLiveStroke,
+      readSourcePixels: deps.readSourcePixels,
       setCursor: (cursor) => {
         this.cursorOverride = cursor;
         this.applyCursor();
