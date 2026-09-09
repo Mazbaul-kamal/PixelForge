@@ -23,6 +23,7 @@ import { SelectionMask } from './core/selection';
 import { deselect, invertSelection, selectAll, setSelection } from './core/selection-ops';
 import { createLassoTool } from './tools/lasso-tool';
 import { createBucketTool } from './tools/bucket-tool';
+import { createCropTool } from './tools/crop-tool';
 import { createEyedropperTool } from './tools/eyedropper-tool';
 import { createGradientTool } from './tools/gradient-tool';
 import { createMagicWandTool } from './tools/magic-wand-tool';
@@ -280,6 +281,15 @@ function boot(): void {
   toolManager.register(createEyedropperTool({ onHover: (sample) => infoPanel.show(sample) }));
   // Alt borrows the eyedropper from any tool and springs back on release.
   toolManager.registerTemporaryOverride('alt', 'eyedropper');
+  toolManager.register(
+    createCropTool({
+      onCommitted: () => {
+        thumbnails.markAllDirty();
+        viewport.fitToScreen(doc.width, doc.height);
+        documentChanged();
+      },
+    }),
+  );
 
   // Choosing a preset replaces the working gradient.
   toolManager.context.options.subscribe(() => {
