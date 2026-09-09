@@ -1,0 +1,88 @@
+.pf-app {
+  display: grid;
+  height: 100%;
+  grid-template-columns: var(--pf-rail-w) minmax(0, 1fr) var(--pf-panels-w);
+  grid-template-rows:
+    var(--pf-menubar-h)
+    var(--pf-optionsbar-h)
+    minmax(0, 1fr)
+    var(--pf-status-h);
+  grid-template-areas:
+    "menubar menubar menubar"
+    "options options options"
+    "rail    stage   panels"
+    "status  status  status";
+  background: var(--pf-bg-sunken);
+}
+
+.pf-menubar {
+  grid-area: menubar;
+  background: var(--pf-bg-chrome);
+  border-bottom: 1px solid var(--pf-line);
+}
+
+.pf-optionsbar {
+  grid-area: options;
+  background: var(--pf-bg-panel);
+  border-bottom: 1px solid var(--pf-line);
+}
+
+.pf-rail {
+  grid-area: rail;
+  background: var(--pf-bg-chrome);
+  border-right: 1px solid var(--pf-line);
+}
+
+.pf-panels {
+  grid-area: panels;
+  background: var(--pf-bg-panel);
+  border-left: 1px solid var(--pf-line);
+}
+
+.pf-stage {
+  grid-area: stage;
+  position: relative;
+  overflow: hidden;
+  background: var(--pf-stage);
+  contain: strict;
+}
+
+.pf-view {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.pf-status {
+  grid-area: status;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 0 12px;
+  background: var(--pf-bg-chrome);
+  border-top: 1px solid var(--pf-line);
+  font-family: var(--pf-font-mono);
+  font-size: 11px;
+  color: var(--pf-text-dim);
+  user-select: none;
+}
+
+.pf-status-field {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.pf-status-label {
+  color: var(--pf-text-dim);
+  opacity: 0.75;
+}
+
+.pf-status-value {
+  color: var(--pf-text);
+  font-variant-numeric: tabular-nums;
+  min-width: 6ch;
+}

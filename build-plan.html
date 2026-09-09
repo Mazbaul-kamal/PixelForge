@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PixelForge — ধাপে ধাপে বিল্ড প্রম্পট</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#eef1f0; --card:#ffffff; --ink:#12181b; --ink-2:#4a565c; --ink-3:#7c8a91;
+  --rule:#d3dad8; --rule-2:#e4e9e7; --teal:#12667c; --teal-soft:#dcecef; --amber:#9a6a1f;
+  --code-bg:#141a1d; --code-ink:#d8e2e5; --code-dim:#7f9198;
+  --bn:'Noto Sans Bengali', ui-sans-serif, system-ui, sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0f1416; --card:#161d20; --ink:#e3eaec; --ink-2:#a2b0b5; --ink-3:#6f8087;
+    --rule:#2a3438; --rule-2:#222b2e; --teal:#4fb6cf; --teal-soft:#12303a; --amber:#d0a054;
+    --code-bg:#0a0e10; --code-ink:#d8e2e5; --code-dim:#7f9198;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0f1416; --card:#161d20; --ink:#e3eaec; --ink-2:#a2b0b5; --ink-3:#6f8087;
+  --rule:#2a3438; --rule-2:#222b2e; --teal:#4fb6cf; --teal-soft:#12303a; --amber:#d0a054;
+  --code-bg:#0a0e10; --code-ink:#d8e2e5; --code-dim:#7f9198;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--bn); font-size:16px; line-height:1.72;
+}
+.wrap{max-width:920px; margin:0 auto; padding:0 22px 100px}
+
+/* ---------- masthead ---------- */
+header.top{padding:58px 0 30px; border-bottom:2px solid var(--ink)}
+h1{margin:0 0 6px; font-size:clamp(30px,5.4vw,46px); line-height:1.16; font-weight:700; letter-spacing:-.015em}
+.sub{margin:0; color:var(--ink-2); max-width:60ch}
+.meta{display:flex; flex-wrap:wrap; gap:10px 26px; margin-top:22px; font-family:var(--mono); font-size:12.5px; color:var(--ink-3)}
+.meta b{color:var(--teal); font-weight:500}
+
+.progwrap{margin-top:26px; display:flex; align-items:center; gap:14px}
+.progbar{flex:1; height:6px; background:var(--rule-2); border-radius:99px; overflow:hidden}
+.progbar i{display:block; height:100%; width:0; background:var(--teal); transition:width .3s}
+.progtxt{font-family:var(--mono); font-size:12.5px; color:var(--ink-2); white-space:nowrap}
+.reset{font-family:var(--mono); font-size:12px; color:var(--ink-3); background:none; border:0; cursor:pointer; text-decoration:underline; padding:0}
+.reset:hover{color:var(--teal)}
+
+/* ---------- how to use ---------- */
+.howto{margin:34px 0 0; padding:22px 24px; background:var(--card); border:1px solid var(--rule); border-radius:3px}
+.howto h2{margin:0 0 10px; font-size:17px; font-weight:600}
+.howto ol{margin:0; padding-left:20px; color:var(--ink-2)}
+.howto li{margin-bottom:7px}
+.howto li::marker{color:var(--teal); font-family:var(--mono); font-size:13px}
+.note{margin-top:14px; padding-top:14px; border-top:1px solid var(--rule-2); font-size:14.5px; color:var(--ink-3)}
+
+/* ---------- phases ---------- */
+.phase{margin:56px 0 0; padding-top:14px; border-top:1px solid var(--rule); display:flex; align-items:baseline; gap:16px}
+.phase .tag{font-family:var(--mono); font-size:12px; color:var(--amber); white-space:nowrap}
+.phase h2{margin:0; font-size:20px; font-weight:600; letter-spacing:-.01em}
+.phase p{margin:0 0 0 auto; font-size:13.5px; color:var(--ink-3); text-align:right}
+
+/* ---------- step ---------- */
+.step{display:grid; grid-template-columns:62px 1fr; gap:0 20px; margin-top:30px}
+.gutter{padding-top:4px}
+.num{font-family:var(--mono); font-size:26px; font-weight:500; color:var(--ink-3); font-variant-numeric:tabular-nums; line-height:1}
+.step.done .num{color:var(--teal)}
+.check{margin-top:12px; width:22px; height:22px; border:1.5px solid var(--rule); border-radius:3px; background:var(--card);
+  cursor:pointer; display:grid; place-items:center; padding:0}
+.check:hover{border-color:var(--teal)}
+.check svg{width:13px; height:13px; stroke:var(--card); stroke-width:2.4; fill:none; stroke-linecap:round; stroke-linejoin:round}
+.step.done .check{background:var(--teal); border-color:var(--teal)}
+.step.done .check svg{stroke:var(--paper)}
+
+.step h3{margin:0 0 4px; font-size:19px; font-weight:600; letter-spacing:-.01em}
+.step.done h3{color:var(--ink-2)}
+.goal{margin:0 0 14px; color:var(--ink-2); font-size:15px}
+.deps{font-family:var(--mono); font-size:11.5px; color:var(--ink-3); margin:0 0 12px}
+
+.prompt{position:relative; background:var(--code-bg); border-radius:4px; overflow:hidden}
+.prompt .bar{display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:8px 10px 8px 14px; border-bottom:1px solid rgba(255,255,255,.08)}
+.prompt .bar span{font-family:var(--mono); font-size:11px; color:var(--code-dim)}
+.copy{font-family:var(--mono); font-size:11.5px; color:var(--code-ink); background:rgba(255,255,255,.08);
+  border:0; border-radius:3px; padding:5px 11px; cursor:pointer}
+.copy:hover{background:rgba(255,255,255,.16)}
+.copy.ok{background:var(--teal); color:#06171c}
+pre{margin:0; padding:15px 16px; overflow-x:auto; font-family:var(--mono); font-size:12.6px; line-height:1.68;
+  color:var(--code-ink); white-space:pre-wrap; word-wrap:break-word; max-height:22em; overflow-y:auto}
+.step.open pre{max-height:none}
+.expand{width:100%; padding:7px; background:rgba(255,255,255,.05); border:0; cursor:pointer;
+  font-family:var(--mono); font-size:11px; color:var(--code-dim)}
+.expand:hover{color:var(--code-ink)}
+
+.check-list{margin:12px 0 0; padding:0; list-style:none; font-size:14.5px; color:var(--ink-2)}
+.check-list li{padding-left:20px; position:relative; margin-bottom:3px}
+.check-list li::before{content:''; position:absolute; left:4px; top:11px; width:6px; height:6px;
+  border-radius:99px; background:var(--teal)}
+
+footer{margin-top:70px; padding-top:22px; border-top:2px solid var(--ink); color:var(--ink-3); font-size:14.5px}
+footer b{color:var(--ink-2); font-weight:600}
+
+.themetoggle{position:fixed; right:18px; top:18px; z-index:10; font-family:var(--mono); font-size:11.5px;
+  background:var(--card); border:1px solid var(--rule); color:var(--ink-2); border-radius:3px; padding:6px 11px; cursor:pointer}
+.themetoggle:hover{border-color:var(--teal); color:var(--teal)}
+
+@media (max-width:660px){
+  .step{grid-template-columns:1fr; gap:0}
+  .gutter{display:flex; align-items:center; gap:12px; margin-bottom:8px}
+  .check{margin-top:0}
+  .phase{flex-wrap:wrap}
+  .phase p{margin-left:0; text-align:left; width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<button class="themetoggle" id="themeBtn">থিম</button>
+<div class="wrap">
+
+<header class="top">
+  <h1>PixelForge — ধাপে ধাপে বিল্ড প্রম্পট</h1>
+  <p class="sub">Photopea-ধাঁচের ব্রাউজার ইমেজ এডিটর বানানোর ২৬টি প্রম্পট। প্রতিটা ধাপে একটা করে টুল বা সিস্টেম — সম্পূর্ণ কাজ করা অবস্থায়, আধা-বানানো কিছু নয়।</p>
+  <div class="meta">
+    <span>স্ট্যাক <b>TypeScript + Vite</b></span>
+    <span>ইঞ্জিন <b>Canvas 2D → WebGL</b></span>
+    <span>ধাপ <b id="mStep">26</b></span>
+    <span>আনুমানিক <b>৮–১২ সপ্তাহ</b></span>
+  </div>
+  <div class="progwrap">
+    <div class="progbar"><i id="progFill"></i></div>
+    <span class="progtxt" id="progTxt">০ / ২৬</span>
+    <button class="reset" id="resetBtn">রিসেট</button>
+  </div>
+</header>
+
+<section class="howto">
+  <h2>কীভাবে ব্যবহার করবেন</h2>
+  <ol>
+    <li>নতুন চ্যাট বা Claude Code সেশন শুরুর সময় একবার <b>প্রজেক্ট কনটেক্সট</b> (ধাপ ০) পেস্ট করুন।</li>
+    <li>এরপর এক সেশনে একটাই ধাপের প্রম্পট দিন। একসাথে দুটো দিলে দুটোই আধা হয়।</li>
+    <li>প্রতি ধাপ শেষে নিজে ব্রাউজারে হাতে-কলমে টেস্ট করুন — নিচের চেকলিস্ট মিলিয়ে।</li>
+    <li>কাজ করলে <code>git commit</code> করুন, তারপর ঘরটা টিক দিন। না করলে পরের ধাপে যাবেন না — ভিত্তি নড়বড়ে থাকলে ১৫ নম্বর ধাপে এসে সব ভাঙবে।</li>
+  </ol>
+  <p class="note">প্রম্পটগুলো ইংরেজিতে রাখা হয়েছে ইচ্ছাকৃতভাবে — ভেরিয়েবল, ইন্টারফেস আর API-এর নাম ইংরেজি, তাই কোডিং এজেন্ট কম ভুল করে। ব্যাখ্যা আর চেকলিস্ট বাংলায়।</p>
+</section>
+
+<div id="steps"></div>
+
+<footer>
+  <p><b>একটা পরামর্শ:</b> ধাপ ১০ (সিলেকশন মাস্ক ইঞ্জিন) আর ধাপ ২৬ (টাইলিং) — এই দুটোই সবচেয়ে বেশি রিরাইট ঘটায় যদি আগে ঠিকভাবে ডিজাইন না করেন। ১০ নম্বরে সিলেকশনকে শুরু থেকেই মাস্ক হিসেবে বানাবেন, rectangle হিসেবে নয়। পরে ঠিক করতে গেলে প্রতিটা টুল ছুঁতে হবে।</p>
+</footer>
+
+</div>
+
+<script>
+const CONTEXT = `PROJECT CONTEXT — read this before every task in this project.
+
+We are building PixelForge: a browser-based, layer-driven image editor in the spirit of Photopea. It runs entirely client-side. No backend, no image uploads to a server.
+
+Stack and rules:
+- TypeScript, Vite, ES modules. Strict mode on.
+- The canvas engine is plain TypeScript. Do NOT put engine state in a UI framework. If you use a framework at all, it renders panels only and never re-renders during a brush stroke.
+- No image-editing libraries. We write the compositor, the brush engine and the selection engine ourselves. Utility libraries for parsing formats (e.g. ag-psd later) are fine.
+- Plain CSS with custom properties. Dark UI, neutral greys, one accent colour, so image colours are judged against a neutral surround.
+- Every feature must be usable with the mouse, with a keyboard shortcut, and on a touch screen via Pointer Events.
+
+Non-negotiable architecture:
+- Document: { width, height, layers: Layer[], activeLayerId, selection }. layers[0] is the BOTTOM layer.
+- Layer: { id, name, canvas, ctx, x, y, opacity, blendMode, visible, locked, type, mask? }.
+- One offscreen "composite" canvas at document size. Layers are drawn into it with globalAlpha and globalCompositeOperation. The transparency checkerboard is NEVER drawn into it, only into the on-screen view, otherwise blend modes composite against the checkerboard.
+- Viewport: { zoom, panX, panY } plus screenToDoc() and docToScreen() helpers. All tools work in document coordinates and convert only at the edges.
+- One requestAnimationFrame loop draws the view. Nothing else touches the view canvas.
+- Every user-visible change goes through the history system. A feature is not done until undo and redo restore it exactly.
+
+Working style:
+- Implement ONLY the step I give you. Leave clearly named hooks for later steps, but no placeholder features and no TODO stubs in shipped paths.
+- Keep files small and single-purpose. Tell me the file tree you changed at the end.
+- After each step, list what I should click to verify it works.`;
+
+const STEPS = [
+{ phase:'ভিত্তি', phaseNote:'এই চারটা ধাপ ছাড়া কোনো টুল বানানো যাবে না।',
+  n:1, title:'কোর ইঞ্জিন — ডকুমেন্ট, লেয়ার, কম্পোজিটর, ভিউপোর্ট',
+  goal:'একটা খালি ডকুমেন্ট স্ক্রিনে আসবে, জুম আর প্যান মাখনের মতো চলবে।',
+  deps:'নির্ভরতা: নেই',
+  prompt:`Step 1 of PixelForge. Build the foundation only — no tools yet.
+
+Set up the Vite + TypeScript project and implement:
+
+1. Document and Layer models exactly as described in the project context. A layer owns its own HTMLCanvasElement which may be smaller than the document and is positioned at (x, y). Add createLayer(), addLayer(), removeLayer(), moveLayer(from, to), getActiveLayer().
+
+2. Compositor. One offscreen canvas at document size. Redraw it only when a dirty flag is set, never per frame unconditionally. Draw each visible layer with globalAlpha = opacity and globalCompositeOperation = blendMode. Support all 16 canvas blend modes. Reset alpha and composite operation after the loop.
+
+3. Viewport. { zoom, panX, panY }, zoom clamped to 0.02..32. screenToDoc() and docToScreen(). Zoom towards the pointer position, not the canvas centre. Wheel zooms; shift+wheel and middle-drag pan. Set imageSmoothingEnabled = false when zoom > 1 so pixels stay crisp, true when zoomed out. Add fitToScreen() and actualSize().
+
+4. View renderer. The on-screen canvas fills its container, is sized with devicePixelRatio (capped at 2), and is re-sized by a ResizeObserver that keeps the document visually centred. One requestAnimationFrame loop draws: a checkerboard pattern clipped to the document rect, the composite scaled by zoom, then a 1px document border.
+
+5. App shell. CSS grid layout with menu bar, options bar, left tool rail, canvas stage, right panel column, status bar. Leave them empty except the status bar, which shows document size, zoom percent and the pointer position in document coordinates.
+
+Boot with a 1200x800 document holding one opaque white layer, fitted to the screen.
+
+Done when: zooming and panning stays at 60fps, the checkerboard never scrolls out of alignment with the document rect, and the status bar coordinates are exact at any zoom level.`,
+  checks:['১২০০×৮০০ সাদা ক্যানভাস মাঝখানে ফিট হয়ে আসে','কার্সরের নিচে ধরে জুম হয়, কেন্দ্র ধরে নয়','উইন্ডো রিসাইজ করলে ক্যানভাস লাফায় না','৩২০০% জুমে পিক্সেল ঝাপসা না হয়ে চৌকো দেখায়'] },
+
+{ n:2, title:'হিস্ট্রি সিস্টেম — আন্ডু ও রিডু',
+  goal:'দুই ধরনের হিস্ট্রি এন্ট্রি, যাতে বড় ছবিতেও মেমরি না ফাটে।',
+  deps:'নির্ভরতা: ধাপ ১',
+  prompt:`Step 2 of PixelForge. Build the history system before any tool exists, so every later feature can plug into it.
+
+Implement a command-based undo/redo stack with two entry kinds, because full snapshots of a 4000x4000 document will exhaust memory:
+
+1. Pixel entries. For an edit confined to one layer's bitmap (a brush stroke, a fill, a filter): store a clone of that layer's canvas before and after. Nothing else.
+
+2. Structural entries. For changes to the layer list, layer order, document size, layer x/y, opacity, blend mode or selection: store a shallow document snapshot in which each layer canvas is cloned by reference where unchanged and cloned deeply only where needed.
+
+API: history.push(label, undo, redo), history.undo(), history.redo(), history.canUndo/canRedo. Cap the stack at 50 entries and drop the oldest. Pushing after an undo truncates the redo tail.
+
+Add a helper transaction(label, fn) that captures state before, runs fn, captures after and pushes one entry — so a multi-step operation is one undo.
+
+Continuous edits must coalesce: dragging an opacity slider from 100 to 40 is ONE history entry, not sixty. Open the transaction on the first input and commit it on change/pointerup.
+
+Also build a History panel in the right column listing entry labels with the current position highlighted, and make clicking an entry jump to that state. Wire Ctrl+Z and Ctrl+Shift+Z.
+
+Done when: undo restores pixels, layer order, opacity, blend mode and document size identically, and holding Ctrl+Z walks the whole stack back to the initial state without drift.`,
+  checks:['স্লাইডার টেনে ছাড়লে একটাই আন্ডু এন্ট্রি হয়','হিস্ট্রি প্যানেলে ক্লিক করে যেকোনো অবস্থায় লাফানো যায়','৫০ ধাপের বেশি হলে পুরোনোগুলো ঝরে যায়, ক্র্যাশ করে না'] },
+
+{ n:3, title:'লেয়ার প্যানেল',
+  goal:'লেয়ার নিয়ে যা যা করা লাগে, সব একসাথে — অর্ধেক নয়।',
+  deps:'নির্ভরতা: ধাপ ১, ২',
+  prompt:`Step 3 of PixelForge. Build the complete Layers panel. Every action here must be undoable through the history system from step 2.
+
+The panel lists layers top-first (reverse of the array order). Each row shows:
+- a visibility eye toggle
+- a live thumbnail of the layer bitmap, drawn over a small checkerboard so transparency is visible
+- the layer name, editable by double-click
+- a lock icon that blocks painting and moving on that layer
+- a type badge for non-raster layers
+
+Panel actions: new layer, duplicate, delete, move up, move down, merge down, flatten image, and multi-select with Shift and Ctrl for group delete and group move.
+
+Above the list: a blend mode dropdown with all 16 modes and an opacity slider, both applying to the active layer and both coalescing into single history entries.
+
+Implement drag-and-drop reordering of rows, with a visible insertion line, working with Pointer Events so it also works by touch.
+
+Performance requirement: regenerating thumbnails is expensive. Mark a layer thumb-dirty when its bitmap changes and regenerate at most every 300ms, and never during an active pointer drag.
+
+Merge down must bake the upper layer's opacity, blend mode and offset into the lower one and produce a plain normal-mode layer at 100%.
+
+Done when: reordering, merging and deleting all survive undo/redo, and painting on a large layer does not stutter because of thumbnail work.`,
+  checks:['ড্র্যাগ করে লেয়ারের ক্রম বদলানো যায়','মার্জ ডাউনে ব্লেন্ড মোড ও অপাসিটি সঠিকভাবে বেক হয়','লক করা লেয়ারে আঁকা যায় না','থাম্বনেইলের কারণে আঁকা আটকায় না'] },
+
+{ n:4, title:'ফাইল ইনপুট-আউটপুট',
+  goal:'ছবি ঢোকানো আর বের করা — ড্র্যাগ, পেস্ট, এক্সপোর্ট।',
+  deps:'নির্ভরতা: ধাপ ১, ২, ৩',
+  prompt:`Step 4 of PixelForge. Wire up getting images in and out. No editing tools yet.
+
+Input paths, all of which create a new layer named after the source file:
+- File picker via a New/Open menu
+- Drag and drop onto the canvas stage, with a drop overlay
+- Clipboard paste of an image
+- Multiple files at once, each becoming its own layer
+
+If the current document is still untouched (a fresh boot document with nothing painted), the first opened image should resize the document to the image and clear history instead of adding a floating layer. Track this with a 'pristine' flag. Otherwise centre the new layer in the document.
+
+New Document dialog: width, height, presets (1080x1080, 1920x1080, 1080x1920, A4 at 300dpi), background of white, transparent or a custom colour.
+
+Export: flatten the composite and save as PNG, or as JPEG with a quality slider and a white matte painted underneath first, or as WebP. Use canvas.toBlob, not toDataURL, so large exports do not blow the string limit. Offer an export scale factor of 0.5x, 1x, 2x.
+
+Add a beforeunload guard that warns when there are unsaved changes.
+
+Handle the failure cases properly: a non-image file, a corrupt image, an image larger than 8000px on a side (offer to downscale on import). Show a real error message that says what to do, not a generic alert.
+
+Done when: three images dropped at once become three correctly named layers, and a PNG export opens in another program with transparency intact.`,
+  checks:['একসাথে ৩টা ছবি ড্রপ করলে ৩টা লেয়ার হয়','Ctrl+V দিয়ে স্ক্রিনশট পেস্ট হয়','JPG এক্সপোর্টে স্বচ্ছ অংশ সাদা হয়, কালো নয়','ভুল ফাইল দিলে বোধগম্য বার্তা আসে'] },
+
+{ phase:'টুল ইঞ্জিন', phaseNote:'একটা ভালো টুল ইন্টারফেস — এরপর প্রতিটা টুল আধা দিনের কাজ।',
+  n:5, title:'টুল ফ্রেমওয়ার্ক, টুলবার ও অপশন বার',
+  goal:'একটা কনট্র্যাক্ট, যাতে পরের ১৬টা টুল একই ছাঁচে বসে।',
+  deps:'নির্ভরতা: ধাপ ১–৪',
+  prompt:`Step 5 of PixelForge. Build the tool framework. This is the contract every later tool implements, so design it carefully.
+
+Define a Tool interface:
+
+interface Tool {
+  id: string; name: string; shortcut: string; cursor: string;
+  options: OptionSpec[];
+  onPointerDown(c: ToolContext, p: ToolPointer): void;
+  onPointerMove(c: ToolContext, p: ToolPointer): void;
+  onPointerUp(c: ToolContext, p: ToolPointer): void;
+  onKeyDown?(c: ToolContext, e: KeyboardEvent): boolean;
+  drawOverlay?(ctx: CanvasRenderingContext2D, c: ToolContext): void;
+  activate?(c: ToolContext): void;
+  deactivate?(c: ToolContext): void;
+}
+
+ToolPointer carries document coordinates, screen coordinates, pressure, tilt, button and the modifier keys. ToolContext exposes the document, active layer, selection, viewport, history, colour state and a requestRender() call. A tool must never touch the view canvas directly — overlays are drawn only through drawOverlay, which the render loop calls last.
+
+OptionSpec is a declarative schema — slider, number, colour, select, checkbox, button — and the options bar renders itself from the active tool's array. Adding a tool must never require editing the options bar.
+
+Build a ToolManager: registry, setActiveTool, shortcut routing, pointer capture, and a temporary-tool override so holding Space gives Hand and holding Alt gives Eyedropper while another tool is active, returning to the previous tool on key release.
+
+Build the left tool rail with icons, tooltips showing the shortcut, and a keyboard router that ignores shortcuts while a text input has focus.
+
+Add the colour state: foreground and background swatches, X to swap, D to reset to black and white.
+
+Ship exactly one trivial tool to prove the framework — a Hand tool that pans.
+
+Done when: adding a new tool requires only writing one file and one registry line.`,
+  checks:['Space চেপে ধরলে সাময়িকভাবে হাত, ছাড়লে আগের টুল ফিরে আসে','অপশন বার টুলের schema থেকে নিজে তৈরি হয়','টেক্সট বক্সে টাইপ করার সময় শর্টকাট ফায়ার করে না'] },
+
+{ phase:'টুল — এক ধাপে এক টুল', phaseNote:'প্রতিটা ধাপ শেষে সেই টুল দিয়ে আসল কাজ করা যাবে।',
+  n:6, title:'ন্যাভিগেশন — হাত ও জুম টুল',
+  goal:'সবচেয়ে সহজ দুটো, ফ্রেমওয়ার্ক যাচাই করার জন্য।',
+  deps:'নির্ভরতা: ধাপ ৫',
+  prompt:`Step 6 of PixelForge. Implement the Hand tool and the Zoom tool fully, as the first real users of the tool framework.
+
+Hand (H): drag to pan with momentum-free 1:1 tracking. Space held anywhere activates it temporarily. Two-finger drag on touch pans. Double-click the Hand icon fits the document to the screen.
+
+Zoom (Z): click to zoom in about the click point, Alt+click to zoom out. Drag right to zoom in continuously and left to zoom out, anchored to the drag start point. Options bar: Fit, 100%, Fill, and a checkbox for smooth (fractional) zoom versus stepped zoom through the standard ladder 1/16, 1/8, 1/4, 1/3, 1/2, 1, 2, 3, 4, 8, 16, 32.
+
+Add view shortcuts globally: Ctrl+0 fit, Ctrl+1 actual size, Ctrl+plus and Ctrl+minus stepped zoom about the viewport centre.
+
+Add a zoom percentage field in the status bar that accepts typed input.
+
+Constrain panning so the document can never be dragged entirely off screen — always keep at least 60px of it visible.
+
+Done when: zooming with the ladder lands on exact percentages, and panning at 3200% zoom on a large document stays smooth.`,
+  checks:['Alt+ক্লিকে জুম আউট হয়','স্ট্যাটাস বারে ৪৫০ টাইপ করলে ৪৫০% জুম হয়','ক্যানভাস পুরোপুরি স্ক্রিনের বাইরে টেনে নেওয়া যায় না'] },
+
+{ n:7, title:'মুভ টুল',
+  goal:'লেয়ার সরানো — স্ন্যাপিং, অটো-সিলেক্ট, অ্যালাইনমেন্ট সহ।',
+  deps:'নির্ভরতা: ধাপ ৫',
+  prompt:`Step 7 of PixelForge. Implement the Move tool (V) completely.
+
+Behaviour:
+- Drag moves the active layer. Shift constrains to horizontal, vertical or 45 degrees.
+- Arrow keys nudge by 1px, Shift+arrow by 10px. A run of nudges within 600ms coalesces into one history entry.
+- Alt+drag duplicates the layer and moves the copy.
+- An "Auto-select layer" option: when on, pointer-down picks the topmost layer whose pixel under the cursor has alpha above 8, so clicking on empty space does not steal the selection.
+- If there is an active selection and the option "Move selected pixels" is on, cut the selected pixels out of the layer and move them as a floating region until deselect or another tool commits them.
+
+Show a dashed outline of the active layer's bounds while the Move tool is active, and 8 non-interactive corner markers so the layer extent is legible.
+
+Smart guides: while dragging, detect alignment of the moving layer's edges and centre with the document edges, the document centre and other visible layers' edges, within a 6px screen threshold. Snap to them and draw magenta guide lines for the matches. Hold Ctrl to suspend snapping.
+
+Options bar: auto-select on/off, move-selected-pixels on/off, snapping on/off, plus alignment buttons that align the layer to the document — left, horizontal centre, right, top, middle, bottom.
+
+Done when: dragging a layer near the document centre snaps with a visible guide, and every move including nudges is one clean undo.`,
+  checks:['Shift ধরে টানলে সোজা যায়','স্মার্ট গাইড দেখা যায় ও স্ন্যাপ হয়','Alt+ড্র্যাগে কপি তৈরি হয়','তিরচিহ্ন দিয়ে ১px নাড়ানো যায়'] },
+
+{ n:8, title:'ব্রাশ টুল',
+  goal:'পুরো অ্যাপের সবচেয়ে গুরুত্বপূর্ণ টুল — এখানে সময় দিন।',
+  deps:'নির্ভরতা: ধাপ ৫',
+  prompt:`Step 8 of PixelForge. Implement the Brush tool (B). This is the most important tool in the app; treat the stroke engine as a real subsystem.
+
+Stroke engine:
+- Stamp-based. A dab is a radial gradient whose inner stop sits at radius x hardness, so hardness 100% is a hard circle and 0% is fully soft.
+- Spacing is a percentage of brush diameter, default 12%. Interpolate dabs along the path by arc length, never one dab per pointer event, or fast strokes will look like dotted lines.
+- Use getCoalescedEvents() on pointermove so fast strokes on high-refresh devices capture every sample.
+- Smooth the input path with a light exponential smoothing or Catmull-Rom fit so hand jitter does not show, with a "Smoothing" slider from 0 to 100.
+
+Correct opacity handling, which is the part people get wrong: stamp the whole stroke into a separate stroke buffer canvas at full alpha, then composite that buffer onto the layer once at the stroke opacity. If you stamp directly onto the layer, overlapping dabs within one stroke darken each other and opacity 30% looks like 80%. Flow, by contrast, applies per dab, so implement flow inside the buffer and opacity at the final composite.
+
+Pressure: use PointerEvent.pressure to modulate size and/or opacity, each toggleable. Fall back to constant 0.5 for mouse.
+
+Respect the active selection by clipping the stroke buffer to it, and respect the layer lock.
+
+Options bar: size 1-2000 with [ and ] shortcuts, hardness, opacity, flow, spacing, smoothing, pressure toggles, and blend mode for the stroke itself.
+
+Show a live brush cursor ring at true size, drawn as a black outline under a white outline so it is visible on any image.
+
+Done when: a slow scribble and a fast flick produce the same continuous line, and a 20% opacity stroke that crosses itself has uniform density.`,
+  checks:['দ্রুত টানলেও লাইন ভাঙা-ভাঙা হয় না','২০% অপাসিটির স্ট্রোক নিজের উপর দিয়ে গেলেও সমান গাঢ়','ব্রাশ রিং যেকোনো ছবির উপরে দেখা যায়','স্টাইলাসে চাপ দিলে দাগ মোটা হয়'] },
+
+{ n:9, title:'ইরেজার টুল',
+  goal:'ব্রাশ ইঞ্জিন পুনর্ব্যবহার — কিন্তু ব্যাকগ্রাউন্ড লেয়ারের আচরণ আলাদা।',
+  deps:'নির্ভরতা: ধাপ ৮',
+  prompt:`Step 9 of PixelForge. Implement the Eraser tool (E) by reusing the stroke engine from step 8 — do not fork the code, extract the shared parts.
+
+The eraser composites the stroke buffer onto the layer with globalCompositeOperation 'destination-out', so soft edges erase partially rather than in a binary way.
+
+Modes in the options bar:
+- Brush eraser, with its own independent size, hardness, opacity and flow settings that persist separately from the Brush tool's.
+- Block eraser: a fixed hard square whose on-screen size stays constant regardless of zoom, which is how people clean up single pixels.
+- "Erase to background colour": on a locked background layer, erasing paints the background colour instead of removing alpha, matching what users expect from a flattened photo.
+
+Add "Erase history": while holding Alt, the eraser restores pixels from the state at the last history checkpoint, which needs a cached snapshot of the layer at that point.
+
+Respect the selection and the layer lock exactly as the Brush does.
+
+Done when: erasing at 40% opacity across the same spot twice removes more alpha than once but a single continuous stroke stays even, and undo restores erased pixels exactly.`,
+  checks:['নরম ধার আংশিক মুছে, কেটে ফেলে না','ব্লক ইরেজারের সাইজ জুমে বদলায় না','ব্রাশ আর ইরেজারের সাইজ আলাদা করে মনে থাকে'] },
+
+{ n:10, title:'রেক্ট্যাঙ্গুলার মার্কি ও সিলেকশন মাস্ক ইঞ্জিন',
+  goal:'এই ধাপটাই সবচেয়ে গুরুত্বপূর্ণ ডিজাইন সিদ্ধান্ত। সিলেকশন = মাস্ক, আয়তক্ষেত্র নয়।',
+  deps:'নির্ভরতা: ধাপ ৫, ২',
+  prompt:`Step 10 of PixelForge. Implement the Rectangular Marquee (M) and, underneath it, the general selection engine. Design the selection as a mask from the very start — if you model it as a rectangle now, every later tool has to be rewritten.
+
+Selection model:
+- An 8-bit alpha mask, a Uint8ClampedArray of width x height at document size, where 255 is fully selected and intermediate values give feathered and anti-aliased edges.
+- Cache a bounding box of non-zero pixels so operations can skip empty regions.
+- selection.isEmpty(), selection.bounds(), selection.clear(), selection.invert(), selection.combine(otherMask, mode) where mode is new, add, subtract or intersect.
+- Provide selection.applyClip(ctx) that installs the mask as a clip for any drawing operation. Since canvas clipping cannot take an arbitrary alpha mask, implement it by drawing into a scratch canvas and compositing back with 'destination-in' against the mask. Every painting tool routes through this one function.
+
+Marching ants: generate the outline by tracing the mask contour with marching squares at the 128 threshold, cache the resulting Path2D, and only regenerate when the mask changes. Draw a black dashed line under a white dashed line with an animated dash offset. Do not redraw the contour every frame.
+
+Rectangular Marquee behaviour: drag to select, Shift constrains to a square, Alt draws from the centre, dragging inside an existing selection moves the selection outline (not the pixels), Shift before pointer-down adds to the selection, Alt subtracts, Shift+Alt intersects.
+
+Options bar: the four combine modes, feather radius in px, anti-alias toggle, and a fixed-size / fixed-ratio mode with width and height fields.
+
+Global commands: Ctrl+A select all, Ctrl+D deselect, Ctrl+Shift+I invert, Delete to clear selected pixels, Alt+Delete to fill with the foreground colour. All undoable.
+
+Done when: a feathered selection filled with colour has soft edges, add and subtract produce a correct compound shape, and the ants trace that compound shape rather than a bounding box.`,
+  checks:['Shift ধরে দ্বিতীয় সিলেকশন যোগ হয়, ants জটিল আকৃতি ঘিরে ধরে','feather ২০px দিলে ভরাট করার পর ধার নরম হয়','Ctrl+Shift+I দিয়ে উল্টানো যায়','সিলেকশনের বাইরে ব্রাশ কাজ করে না'] },
+
+{ n:11, title:'এলিপ্স মার্কি ও ল্যাসো',
+  goal:'একই মাস্ক ইঞ্জিনে তিনটা নতুন আকৃতি।',
+  deps:'নির্ভরতা: ধাপ ১০',
+  prompt:`Step 11 of PixelForge. Add three more selection tools on top of the mask engine from step 10. They must share the combine modes, feather and anti-aliasing code — only the shape generation differs.
+
+Elliptical Marquee (M, cycles with the rectangle): drag to select an ellipse, Shift for a circle, Alt from centre. Rasterise it anti-aliased into the mask by drawing the path onto a scratch canvas and reading its alpha, not by a hand-written ellipse rasteriser.
+
+Lasso (L): freehand. Collect points on pointermove, close the path automatically on pointerup, fill it with the non-zero winding rule.
+
+Polygonal Lasso (L, cycles): click to place vertices, a rubber-band preview line follows the cursor, Backspace removes the last vertex, double-click or clicking the first vertex closes the path, Escape cancels. Shift constrains a segment to 45 degree increments.
+
+Add a shared "Refine" section in the options bar that applies to any selection: expand by N px, contract by N px, feather by N px, and smooth. Implement expand and contract as a simple distance-threshold pass over the mask, and feather as a separable box blur run three times, which approximates a Gaussian and is fast enough to run on a full-size mask.
+
+Also add Ctrl+click on a layer thumbnail to load that layer's alpha as a selection.
+
+Done when: lasso, polygon and ellipse all combine correctly with each other via Shift and Alt, and expand/contract/feather work on any of them.`,
+  checks:['পলিগন ল্যাসোতে Backspace শেষ বিন্দু মোছে','লেয়ার থাম্বনেইলে Ctrl+ক্লিকে সেই লেয়ারের আকৃতি সিলেক্ট হয়','expand/contract যেকোনো আকৃতিতে কাজ করে'] },
+
+{ n:12, title:'ম্যাজিক ওয়ান্ড',
+  goal:'রঙের মিল দেখে সিলেকশন — ফ্লাড ফিল অ্যালগরিদম।',
+  deps:'নির্ভরতা: ধাপ ১০',
+  prompt:`Step 12 of PixelForge. Implement the Magic Wand (W).
+
+Algorithm: a scanline flood fill over the source pixels, writing into the selection mask rather than into pixels. Scanline, not four-way recursion with a point stack — on a 4000x4000 image the naive version is roughly ten times slower and risks stack pressure.
+
+Colour distance: compare in a perceptually reasonable way. Convert to Lab or at least use weighted RGB distance, because plain Euclidean RGB selects sky badly. Tolerance slider 0-100 maps to a distance threshold.
+
+Options bar:
+- Tolerance
+- Contiguous on/off. When off, scan the whole image for matching pixels instead of flood filling.
+- Sample all layers on/off, sampling the composite instead of the active layer.
+- Anti-alias, which softens the mask edge by evaluating partial matches at the boundary rather than hard 0/255.
+- The four combine modes from step 10.
+
+Add "Grow" (expand the selection to adjacent pixels within tolerance) and "Similar" (select all pixels in the image within tolerance of the current selection's colours) as menu commands.
+
+Show a busy indicator if the operation takes more than 150ms, and run the scan in a Web Worker for documents above 4 megapixels so the UI never freezes.
+
+Done when: clicking a photo sky at tolerance 30 selects the sky with a clean anti-aliased edge, and the same click on a 20 megapixel image does not lock up the browser.`,
+  checks:['আকাশে ক্লিক করলে পুরো আকাশ আসে, ধার ঝাঁঝরা হয় না','Contiguous বন্ধ করলে ছড়ানো একই রঙও ধরে','বড় ছবিতে UI জমে যায় না'] },
+
+{ n:13, title:'পেইন্ট বাকেট',
+  goal:'ওয়ান্ডের অ্যালগরিদম পুনর্ব্যবহার, কিন্তু পিক্সেলে লেখে।',
+  deps:'নির্ভরতা: ধাপ ১২',
+  prompt:`Step 13 of PixelForge. Implement the Paint Bucket (G). Reuse the flood-fill core from step 12 — it should produce a region mask, and this tool fills that mask with pixels.
+
+Behaviour: click fills the contiguous region under the cursor with the foreground colour, respecting tolerance, contiguous, sample-all-layers and anti-alias options, and clipped to any active selection.
+
+Critical detail most implementations get wrong: fill through the mask with soft edges, not by writing hard RGBA values into the ImageData. Build the region mask, then composite a solid colour through it using the selection clip helper from step 10, so anti-aliased boundaries blend instead of showing jagged steps.
+
+Options bar: fill source of foreground colour or pattern, tolerance, opacity, blend mode, contiguous, sample all layers, anti-alias.
+
+Add a Pattern fill option with three or four built-in tileable patterns and the ability to define a pattern from the current selection.
+
+Also add the plain Fill command (Shift+F5) that fills the whole selection or layer with the foreground colour, background colour, or a colour picked from a dialog.
+
+Done when: filling a region of an anti-aliased line drawing leaves no white halo along the boundary, which is the standard test for this tool.`,
+  checks:['লাইন-আর্টের ভেতরে ভরাট করলে ধারে সাদা হালকা রেখা থাকে না','প্যাটার্ন ফিল টাইল হয়ে বসে','opacity ও blend mode মানে'] },
+
+{ n:14, title:'গ্রেডিয়েন্ট টুল',
+  goal:'স্টপ সম্পাদনা সহ আসল গ্রেডিয়েন্ট এডিটর।',
+  deps:'নির্ভরতা: ধাপ ৫, ১০',
+  prompt:`Step 14 of PixelForge. Implement the Gradient tool (G, cycles with the bucket).
+
+Drag defines the gradient axis. Shift constrains it to 45 degree increments. Show a live preview of the result while dragging, not just a line.
+
+Types: linear, radial, angle (conic), reflected, diamond. Canvas provides linear and radial; implement angle with createConicGradient, and implement reflected and diamond by generating them into an ImageData pass, since canvas has no primitive for them.
+
+Build a real gradient editor dialog: a stop strip where stops can be dragged, added by clicking the strip, removed by dragging off, each with a colour and a position, plus a separate row of opacity stops. Include a midpoint control between adjacent stops. Ship 8 presets including foreground-to-background, foreground-to-transparent, and a couple of useful multi-stop ones.
+
+Options bar: gradient preset dropdown, type buttons, blend mode, opacity, reverse, dither and transparency toggles.
+
+Dithering matters: smooth gradients across a large area show visible banding in 8-bit. Add a small amount of ordered dither noise when the dither option is on.
+
+Clip to the active selection and honour the layer lock.
+
+Done when: a black-to-white linear gradient across 2000px shows no banding with dither on, and the gradient editor round-trips a five-stop gradient correctly.`,
+  checks:['ব্যান্ডিং দেখা যায় না','স্টপ টেনে সরানো ও মোছা যায়','conic ও diamond ঠিকভাবে আসে'] },
+
+{ n:15, title:'আইড্রপার',
+  goal:'ছোট টুল, কিন্তু নমুনা এলাকা আর রিং UI-টা ঠিক করতে হবে।',
+  deps:'নির্ভরতা: ধাপ ৫',
+  prompt:`Step 15 of PixelForge. Implement the Eyedropper (I).
+
+Click or drag samples a colour into the foreground swatch; Alt sets the background swatch instead.
+
+Sample size options: point sample, 3x3 average, 5x5, 11x11, 31x31, 51x51, 101x101 — averaged in linear light, not by naively averaging sRGB values, which shifts the result darker.
+
+Sample source options: current layer, all layers (the composite), or all layers without adjustment layers once those exist in step 23.
+
+Show a Photoshop-style sampling ring at the cursor: a circle split between the previously sampled colour and the currently hovered one, with a thin light and dark outline so it reads on any background. Hide the ordinary cursor while sampling.
+
+Holding Alt while any painting tool is active should temporarily activate this tool through the temporary-override mechanism from step 5, and release should return to the previous tool with its state intact.
+
+Add a small Info readout showing R, G, B, hex and HSL of the hovered pixel, and let clicking the hex value copy it to the clipboard.
+
+Done when: sampling a noisy photo at 31x31 gives a stable average, and Alt-picking mid-brush-stroke does not break the stroke.
+
+Also add a full colour picker dialog opened from the swatches: a saturation/value square, a hue strip, an alpha strip, hex and RGB and HSL fields that stay in sync, and a row of recently used colours.`,
+  checks:['৩১×৩১ নমুনায় noisy ছবিতেও স্থির রঙ আসে','আঁকার সময় Alt চেপে রঙ নিয়ে ছাড়লে ব্রাশে ফিরে আসে','কালার পিকারে hex টাইপ করলে বাকি ফিল্ড মেলে'] },
+
+{ n:16, title:'ক্রপ টুল',
+  goal:'হ্যান্ডল, অনুপাত, গ্রিড ওভারলে ও নন-ডেস্ট্রাক্টিভ ক্রপ।',
+  deps:'নির্ভরতা: ধাপ ৫, ৭',
+  prompt:`Step 16 of PixelForge. Implement the Crop tool (C).
+
+On activation, show a crop rectangle covering the whole document with 8 resize handles and a darkened area outside it. Dragging inside moves the crop; dragging a handle resizes it; Shift preserves the aspect ratio; Alt resizes about the centre.
+
+Options bar: aspect ratio presets (free, original, 1:1, 4:3, 3:2, 16:9, and custom width x height), a resolution field, a straighten control, "Delete cropped pixels" on/off, and a grid overlay selector of none, rule of thirds, golden ratio, or a fine grid.
+
+Straighten: dragging with the straighten control active draws a line the user wants to be horizontal, and the crop rotates the document content by that angle, expanding the crop to the largest inscribed rectangle.
+
+Allow the crop rectangle to extend beyond the current document bounds, which grows the canvas with transparent pixels — this is how people add margin.
+
+Non-destructive mode: when "Delete cropped pixels" is off, keep the layer bitmaps intact and only change the document bounds and layer offsets, so re-cropping later can recover the hidden pixels.
+
+Commit with Enter or the checkmark, cancel with Escape.
+
+Done when: cropping, undoing and re-cropping recovers the original pixels in non-destructive mode, and a straighten of 7 degrees produces a level horizon with no transparent corners.`,
+  checks:['ক্যানভাসের বাইরে টেনে জায়গা বাড়ানো যায়','স্ট্রেইটেন করলে কোণে স্বচ্ছ ফাঁকা থাকে না','নন-ডেস্ট্রাক্টিভ মোডে আন্ডু করলে পিক্সেল ফেরত আসে'] },
+
+{ n:17, title:'টেক্সট টুল',
+  goal:'সম্পাদনযোগ্য টেক্সট লেয়ার — ক্যানভাসে সরাসরি টাইপিং সহ।',
+  deps:'নির্ভরতা: ধাপ ৫, ৩',
+  prompt:`Step 17 of PixelForge. Implement the Text tool (T) with genuinely editable text layers.
+
+A text layer stores its content and style, never just a rendered bitmap: { text, fontFamily, fontSize, fontWeight, italic, letterSpacing, lineHeight, align, colour, strokeWidth, strokeColour }. Its bitmap is regenerated from these properties whenever they change, so text stays editable forever.
+
+Two creation modes: click creates point text that grows freely; drag creates paragraph text in a fixed box that word-wraps and shows overflow with a visual indicator.
+
+Editing must happen on the canvas, not in a dialog. Overlay a transparent contenteditable element positioned and scaled to match the text layer at the current zoom, with a blinking caret and normal text selection. Commit on Escape, Ctrl+Enter or clicking away.
+
+Options bar: font family (list the standard web-safe families plus any the user loads via a local font file), size, weight, italic, colour, alignment, line height, letter spacing, and a stroke.
+
+Implement word wrapping yourself with measureText — canvas has no wrapping. Cache measurements per font and string, or typing in a long paragraph will lag.
+
+Support Bengali and other complex scripts correctly: do not split by character for wrapping, split at grapheme boundaries using Intl.Segmenter, otherwise conjuncts and diacritics break apart.
+
+Double-clicking a text layer's thumbnail re-enters editing with the caret placed where clicked.
+
+Done when: a Bengali paragraph wraps correctly at grapheme boundaries, and changing the font size of an existing layer re-renders it without any loss of the original string.`,
+  checks:['ক্যানভাসেই ক্যারেট দেখা যায় ও টাইপ করা যায়','বাংলা যুক্তাক্ষর ভেঙে যায় না','পুরোনো টেক্সট লেয়ারের ফন্ট বদলালে লেখা অক্ষত থাকে'] },
+
+{ n:18, title:'শেপ টুল',
+  goal:'ভেক্টর শেপ লেয়ার — সম্পাদনযোগ্য, র‍্যাস্টার নয়।',
+  deps:'নির্ভরতা: ধাপ ৫, ১৭',
+  prompt:`Step 18 of PixelForge. Implement the Shape tools (U) as vector shape layers, following the same principle as text: store the geometry, render the bitmap from it.
+
+Shapes: rectangle (with independent corner radii), rounded rectangle, ellipse, line, polygon with an N-sides control, star with a points and inset control, and a custom path.
+
+A shape layer stores { kind, params, fill, stroke: { colour, width, align, dash, cap, join } } and re-renders on any change. Shift constrains to a regular shape, Alt draws from the centre.
+
+After drawing, show editable handles: corner and edge handles for resizing, a rotation handle, and for the rectangle a corner-radius handle. Handles must be drawn in the tool overlay in screen space so they stay a constant size regardless of zoom.
+
+Path operations on the layer: combine, subtract, intersect and exclude two shapes on the same layer, implemented with canvas path winding rules where possible.
+
+Options bar: fill colour or none, stroke colour, stroke width, dash pattern, corner radius, the shape-specific parameters, and the path operation mode.
+
+Add "Rasterise layer" as a command on both shape and text layers, which bakes the bitmap and drops the vector data, with a confirmation because it is irreversible except through undo.
+
+Done when: a rounded rectangle drawn at 25% zoom, then edited at 400% zoom, has handles of the same on-screen size and re-renders crisply at the new resolution.`,
+  checks:['জুম বদলালেও হ্যান্ডল একই মাপের থাকে','শেপ এঁকে ফেলার পরও কোণের ব্যাসার্ধ বদলানো যায়','stroke align (inside/center/outside) কাজ করে'] },
+
+{ n:19, title:'ক্লোন স্ট্যাম্প ও হিলিং',
+  goal:'রিটাচিং — নমুনা বিন্দু, অফসেট আর অ্যালাইনড মোড।',
+  deps:'নির্ভরতা: ধাপ ৮',
+  prompt:`Step 19 of PixelForge. Implement the Clone Stamp (S) and the Spot Healing brush, both built on the stroke engine from step 8.
+
+Clone Stamp: Alt+click sets the source point. Painting then copies pixels from the source, offset by the vector between the source point and the stroke start, through the same soft brush dab shape. Show a crosshair marker at the live source position while painting, and a preview of the source content inside the brush cursor ring, which is what makes this tool usable.
+
+Options: aligned on/off (aligned keeps the source offset fixed across separate strokes; unaligned resets to the original source each stroke), sample current layer or all layers, opacity, flow, and a "Clone to a new layer" option that writes into an empty layer above so the original is untouched.
+
+Spot Healing: on pointerup over a stroked region, take the surrounding ring of pixels and fill the region by solving a simple gradient-domain blend — a few hundred iterations of Poisson-style relaxation over the masked region is enough and is fast on small blemishes. Match texture roughly, then match the surrounding colour, so a blemish on skin disappears rather than turning into a smudged blob.
+
+Cap the healing region size and warn the user if the stroked region is larger than a few hundred thousand pixels, since the relaxation cost grows with area.
+
+Done when: a dust spot on a photo disappears with one dab of Spot Healing without a visible patch edge, and cloning across a texture leaves no seam because the soft brush edges overlap correctly.`,
+  checks:['ব্রাশ রিংয়ের ভেতরে উৎসের প্রিভিউ দেখা যায়','aligned/unaligned আচরণ আলাদা','দাগের উপরে এক টান দিলে দাগ মিলিয়ে যায়, তালি পড়ে না'] },
+
+{ n:20, title:'ডজ, বার্ন ও স্মাজ',
+  goal:'তিনটা পিক্সেল-ম্যানিপুলেশন ব্রাশ এক ধাপে।',
+  deps:'নির্ভরতা: ধাপ ৮',
+  prompt:`Step 20 of PixelForge. Implement Dodge, Burn and Smudge (O and R), all as stroke-engine brushes that read and write the layer bitmap per dab.
+
+Dodge lightens and Burn darkens, each with a Range option of shadows, midtones or highlights, and an Exposure slider. Apply the adjustment weighted by a tonal falloff curve so that, for example, dodging in "highlights" mode barely touches dark pixels. Add a "Protect tones" option that limits saturation shift, otherwise dodging skin turns it orange.
+
+Smudge pushes pixels along the stroke direction. Implement it as a moving sample buffer: at each dab, blend the buffer into the destination at the strength setting, then re-sample the destination into the buffer. Strength 0 does nothing, 100 drags a colour indefinitely. Add a "Finger painting" option that starts the buffer with the foreground colour.
+
+These tools read pixels as they paint, so they cannot use the deferred stroke-buffer approach from step 8. Apply them per dab directly to the layer, but still take a single before-snapshot at stroke start so the whole stroke is one undo. Restrict per-dab getImageData/putImageData calls to the dab's bounding box only — full-canvas reads per dab will drop you to single-digit frame rates.
+
+Done when: a smudge stroke drags colour smoothly with no visible dab stepping, and dodging a bright area at 20% exposure does not clip to pure white immediately.`,
+  checks:['স্মাজে ধাপে ধাপে ছোপ দেখা যায় না','Range বদলালে প্রভাবও বদলায়','বড় ছবিতেও ব্রাশ থেমে থেমে চলে না'] },
+
+{ n:21, title:'ফ্রি ট্রান্সফর্ম',
+  goal:'স্কেল, রোটেট, স্কিউ, ডিস্টর্ট, পার্সপেক্টিভ — এক জায়গায়।',
+  deps:'নির্ভরতা: ধাপ ৭, ১০',
+  prompt:`Step 21 of PixelForge. Implement Free Transform (Ctrl+T) as a modal tool state rather than an ordinary tool.
+
+On entry, capture the target — the active layer, several selected layers, or the selected pixels — and show a bounding box with 8 handles plus a rotation zone just outside the corners and a movable transform origin.
+
+Interactions:
+- Drag a handle to scale. Shift preserves the aspect ratio. Alt scales about the origin.
+- Drag outside a corner to rotate. Shift snaps to 15 degree increments.
+- Ctrl+drag a corner to distort freely.
+- Ctrl+Shift+drag an edge to skew.
+- Ctrl+Alt+Shift+drag a corner for perspective.
+- Arrow keys nudge; Enter commits; Escape cancels and restores exactly.
+
+Represent the transform as a 3x3 matrix so all of these are one code path. Canvas setTransform only handles affine transforms, so implement the perspective case by subdividing the source into a grid of triangles and drawing each with its own affine approximation — 20x20 subdivisions is visually clean.
+
+Quality rule: do not resample the source repeatedly. Keep the ORIGINAL bitmap and re-render the preview from it on every change, otherwise repeated scaling degrades the image badly. Only bake once on commit, and resample with high quality then.
+
+Options bar: numeric X, Y, width, height, angle, skew fields that are editable, a reference-point selector, and buttons for flip horizontal, flip vertical, rotate 90 CW and CCW.
+
+Done when: scaling down to 10%, back up to 100% and committing gives an image that has been resampled exactly once, and a perspective drag produces straight edges without visible triangle seams.`,
+  checks:['বারবার স্কেল করলেও ছবি ঝাপসা হয় না, একবারই resample হয়','পার্সপেক্টিভে ত্রিভুজের জোড়া দেখা যায় না','সংখ্যার ঘরে টাইপ করে নির্দিষ্ট কোণ দেওয়া যায়'] },
+
+{ phase:'টুলের পরেও যা লাগে', phaseNote:'এখান থেকেই অ্যাপটা খেলনা থেকে যন্ত্রে বদলায়।',
+  n:22, title:'লেয়ার মাস্ক',
+  goal:'নন-ডেস্ট্রাক্টিভ কাজের ভিত্তি।',
+  deps:'নির্ভরতা: ধাপ ১০, ৮',
+  prompt:`Step 22 of PixelForge. Add layer masks — the foundation of non-destructive editing.
+
+A layer gains an optional mask, an 8-bit greyscale canvas at layer size where white reveals and black hides. The compositor applies it by drawing the layer into a scratch canvas and compositing the mask with 'destination-in'.
+
+Panel UI: a mask thumbnail beside the layer thumbnail, with a visible focus ring showing whether painting currently targets the layer or its mask. Clicking either switches the paint target. Every painting tool must respect this target with no special-casing inside the tools — route it through the active-drawing-surface abstraction.
+
+Commands: add empty mask (white), add mask hiding all (black), add mask from the current selection, apply mask (bake into pixels), delete mask, disable mask (Shift+click the thumbnail shows a red X), and Alt+click the thumbnail to view the mask alone on the canvas.
+
+Add a link toggle between layer and mask so moving the layer moves both, on by default.
+
+Also add clipping masks: Alt+click the boundary between two layers so the upper layer is clipped to the lower one's alpha, shown with an indent and a down-arrow in the panel.
+
+Done when: painting black on a mask hides the layer smoothly with soft brush edges, the selection-to-mask command produces an exact match, and clipping masks stack correctly three deep.`,
+  checks:['মাস্কে কালো আঁকলে লেয়ার নরমভাবে লুকায়','Alt+ক্লিকে শুধু মাস্ক দেখা যায়','clipping mask তিন স্তর পর্যন্ত ঠিক থাকে'] },
+
+{ n:23, title:'অ্যাডজাস্টমেন্ট লেয়ার ও ফিল্টার',
+  goal:'পিক্সেল না বদলে রঙ সংশোধন।',
+  deps:'নির্ভরতা: ধাপ ২২',
+  prompt:`Step 23 of PixelForge. Add adjustments in two forms: destructive filters applied to pixels, and non-destructive adjustment layers.
+
+Adjustment layer: a layer type with no bitmap that transforms everything composited below it, within its own mask and clipping scope. The compositor evaluates it in order. Implement: Brightness/Contrast, Levels (with a live histogram, black/white/gamma inputs and output range), Curves (a draggable spline per channel plus RGB), Hue/Saturation/Lightness with per-colour-range targeting, Colour Balance, Black and White with per-channel mixing, Exposure, Vibrance, Photo Filter, and Invert, Threshold, Posterize.
+
+Implement the pixel maths with lookup tables where possible — a 256-entry LUT per channel makes Levels and Curves essentially free compared to a per-pixel function call.
+
+Destructive filters, applied to the active layer through the selection clip: Gaussian Blur (separable, three box-blur passes), Motion Blur, Sharpen and Unsharp Mask, Add Noise, Median/Despeckle, Pixelate, and a High Pass. Each opens a dialog with a live preview on the visible region only, so previewing a 20 megapixel image stays interactive, plus a preview toggle to compare.
+
+Every dialog must have: live preview, a Preview checkbox, Reset, Cancel that restores exactly, and OK that produces one history entry.
+
+Run heavy filters in a Web Worker with a progress bar and a cancel button.
+
+Done when: a Curves adjustment layer sits above three layers and affects all of them, its mask limits the effect, and disabling it restores the original exactly with no rounding drift.`,
+  checks:['Curves লেয়ার নিচের সব লেয়ারে প্রভাব ফেলে','মাস্ক দিয়ে প্রভাব সীমিত করা যায়','প্রিভিউ চেকবক্সে আগে-পরে মেলানো যায়','বড় ছবিতে ফিল্টার UI জমায় না'] },
+
+{ n:24, title:'PSD ইমপোর্ট ও এক্সপোর্ট',
+  goal:'এই একটা ফিচারই অ্যাপটাকে সিরিয়াস বানিয়ে দেয়।',
+  deps:'নির্ভরতা: ধাপ ২২, ২৩',
+  prompt:`Step 24 of PixelForge. Add PSD support. This is the single feature that separates a toy editor from a usable one, because it lets people bring in real work.
+
+Use the ag-psd library rather than writing a parser. Wire it properly:
+
+Import: read layer names, bitmaps, positions, opacity, blend modes, visibility, layer groups (as a folder structure in the panel — add group support to the layer model if it does not exist yet), layer masks, clipping flags, and text layer contents where ag-psd exposes them. Map PSD blend mode names to canvas composite operations, and log any mode you cannot map rather than silently rendering it wrong.
+
+Parse in a Web Worker with a progress indicator. A 200MB PSD must not freeze the tab. Stream layer bitmaps into ImageBitmap objects rather than data URLs.
+
+Export: write back layer structure, names, opacity, blend modes, masks and groups, plus a flattened composite preview so other applications that only read the composite still show the image.
+
+Handle the real-world failures: unsupported colour modes such as CMYK and Lab (convert to RGB with a warning), 16 and 32 bit per channel files (downconvert to 8 bit with a warning), missing composites, and files larger than available memory (fail with a clear message naming the size, not a crash).
+
+Also add PSB support since ag-psd handles it, and add plain layered import from a folder of PNGs.
+
+Done when: a real multi-layer PSD with groups and masks opens with its structure intact, and a file exported from PixelForge reopens correctly in another editor with layers preserved.`,
+  checks:['গ্রুপসহ PSD খুললে ফোল্ডার কাঠামো ঠিক থাকে','ব্লেন্ড মোড ঠিকভাবে ম্যাপ হয়','২০০MB ফাইলে ট্যাব জমে যায় না','এক্সপোর্ট করা ফাইল অন্য এডিটরে লেয়ারসহ খোলে'] },
+
+{ n:25, title:'প্রজেক্ট সেভ ও অটো-রিকভারি',
+  goal:'ব্রাউজার ক্র্যাশ করলে কাজ যেন না হারায়।',
+  deps:'নির্ভরতা: ধাপ ২৪',
+  prompt:`Step 25 of PixelForge. Add local persistence so that closing the tab does not destroy hours of work.
+
+Storage: IndexedDB, not localStorage — layer bitmaps are megabytes and localStorage caps out around 5MB of strings. Store each layer bitmap as a Blob from canvas.toBlob in PNG, plus a JSON document describing the structure.
+
+Features:
+- Save Project and Save As, with a project list showing name, thumbnail, size and last-modified time.
+- Open Project, restoring layers, groups, masks, adjustment layers, selection and viewport state.
+- Autosave every 90 seconds and on visibilitychange, into a separate recovery slot per document, writing only layers whose bitmaps changed since the last autosave.
+- On startup, if a recovery slot is newer than its saved project, offer to restore it with a clear choice, never silently.
+- A storage usage readout using navigator.storage.estimate(), a warning at 80% of quota, and a way to delete old projects.
+- Request persistent storage via navigator.storage.persist() so the browser does not evict projects under pressure.
+
+Do all IndexedDB work off the main thread where possible and never block the render loop on a save.
+
+Also add project export and import as a single .zip file containing the JSON and the PNG layers, so people can move work between devices.
+
+Done when: killing the tab mid-edit and reopening offers a recovery that restores the document exactly, including the selection and which layer was active.`,
+  checks:['ট্যাব বন্ধ করে খুললে রিকভারি অফার আসে','সেভের সময় আঁকা আটকায় না','কোটা প্রায় ভরে গেলে সতর্কবার্তা আসে'] },
+
+{ n:26, title:'পারফরম্যান্স — টাইলিং, ওয়ার্কার, WebGL',
+  goal:'বড় ছবিতেও যেন খেলনা মনে না হয়। এটাই Photopea-র আসল কারিগরি।',
+  deps:'নির্ভরতা: সব',
+  prompt:`Step 26 of PixelForge. Rewrite the rendering hot path for large documents. Until now the compositor redraws every visible layer whenever anything changes, which is fine at 1200x800 and unusable at 6000x4000.
+
+Three changes, in this order, measuring before and after each:
+
+1. Tiled rendering. Split each layer bitmap and the composite into 256x256 tiles. A brush dab marks only the tiles it touches as dirty. Recompositing walks only dirty tiles, and the view draws only tiles intersecting the visible viewport rect. This alone typically turns a 400ms full recomposite into under 5ms for a normal stroke.
+
+2. Move heavy work off the main thread. Filters, PSD parsing, flood fills, mask blurs and thumbnail generation go into a Worker pool sized to navigator.hardwareConcurrency minus one. Transfer ImageBitmap and ArrayBuffer objects rather than copying them. The main thread should only paint and handle input.
+
+3. WebGL compositing. Replace the 2D compositor with a WebGL2 path: each layer tile is a texture, blend modes are fragment shaders, adjustment layers become shader passes evaluated at composite time instead of being baked. Keep the Canvas 2D compositor as a fallback behind a capability check and a settings toggle, because a silent WebGL failure that shows a black canvas is worse than being slow.
+
+Add a debug overlay toggled by a shortcut that shows frame time, recomposite time, dirty tile count, texture memory and layer count, so performance work is measured rather than guessed.
+
+Set an explicit target: a 6000x4000 document with 20 layers must sustain 60fps while painting, and a full recomposite must stay under 16ms.
+
+Done when: the debug overlay confirms those numbers on a mid-range laptop, and disabling WebGL falls back cleanly with identical output.`,
+  checks:['৬০০০×৪০০০, ২০ লেয়ারে আঁকলেও ৬০fps','ডিবাগ ওভারলেতে dirty tile সংখ্যা দেখা যায়','WebGL বন্ধ করলেও একই ফলাফল আসে, কালো স্ক্রিন নয়'] },
+];
+
+/* ---------------- render ---------------- */
+const KEY = 'pixelforge-build-progress-v1';
+let done = new Set();
+try { const raw = localStorage.getItem(KEY); if (raw) done = new Set(JSON.parse(raw)); } catch (e) {}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify([...done])); } catch (e) {} }
+
+const bn = n => String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]);
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const host = document.getElementById('steps');
+
+function promptBlock(label, text, id){
+  return '<div class="prompt">' +
+    '<div class="bar"><span>' + label + '</span>' +
+    '<button class="copy" data-copy="' + id + '">কপি করুন</button></div>' +
+    '<pre id="' + id + '">' + esc(text) + '</pre>' +
+    '<button class="expand">পুরোটা দেখুন</button></div>';
+}
+
+// step 0 — context
+const ctxWrap = document.createElement('div');
+ctxWrap.className = 'step open';
+ctxWrap.innerHTML =
+  '<div class="gutter"><div class="num">০০</div></div>' +
+  '<div><h3>প্রজেক্ট কনটেক্সট</h3>' +
+  '<p class="goal">প্রতিটা নতুন সেশনের শুরুতে একবার পেস্ট করুন। এটাই স্থাপত্যের নিয়ম ঠিক করে দেয় — না দিলে এজেন্ট প্রতিবার নিজের মতো কাঠামো বানাবে।</p>' +
+  promptBlock('context.md', CONTEXT, 'p0') + '</div>';
+host.appendChild(ctxWrap);
+
+STEPS.forEach(s => {
+  if (s.phase){
+    const ph = document.createElement('div');
+    ph.className = 'phase';
+    ph.innerHTML = '<span class="tag">পর্ব</span><h2>' + s.phase + '</h2><p>' + s.phaseNote + '</p>';
+    host.appendChild(ph);
+  }
+  const el = document.createElement('div');
+  el.className = 'step' + (done.has(s.n) ? ' done' : '');
+  el.dataset.n = s.n;
+  el.innerHTML =
+    '<div class="gutter"><div class="num">' + bn(String(s.n).padStart(2,'0')) + '</div>' +
+      '<button class="check" aria-label="সম্পন্ন" aria-pressed="' + done.has(s.n) + '">' +
+      '<svg viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5"/></svg></button></div>' +
+    '<div><h3>' + s.title + '</h3>' +
+      '<p class="goal">' + s.goal + '</p>' +
+      '<p class="deps">' + s.deps + '</p>' +
+      promptBlock('prompt — step ' + s.n, s.prompt, 'p' + s.n) +
+      '<ul class="check-list">' + s.checks.map(c => '<li>' + c + '</li>').join('') + '</ul>' +
+    '</div>';
+  host.appendChild(el);
+});
+
+document.addEventListener('click', e => {
+  const cp = e.target.closest('.copy');
+  if (cp){
+    const text = document.getElementById(cp.dataset.copy).textContent;
+    const ok = () => { cp.textContent = 'কপি হয়েছে ✓'; cp.classList.add('ok');
+      setTimeout(() => { cp.textContent = 'কপি করুন'; cp.classList.remove('ok'); }, 1600); };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(ok, fallback);
+    else fallback();
+    function fallback(){
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); ok(); } catch (err) { cp.textContent = 'কপি করা গেল না'; }
+      ta.remove();
+    }
+    return;
+  }
+  const ex = e.target.closest('.expand');
+  if (ex){
+    const st = ex.closest('.step');
+    st.classList.toggle('open');
+    ex.textContent = st.classList.contains('open') ? 'ছোট করুন' : 'পুরোটা দেখুন';
+    return;
+  }
+  const ck = e.target.closest('.check');
+  if (ck){
+    const st = ck.closest('.step');
+    const n = +st.dataset.n;
+    if (done.has(n)) done.delete(n); else done.add(n);
+    st.classList.toggle('done');
+    ck.setAttribute('aria-pressed', done.has(n));
+    save(); updateProgress();
+  }
+});
+
+function updateProgress(){
+  const total = STEPS.length;
+  document.getElementById('progFill').style.width = (done.size/total*100) + '%';
+  document.getElementById('progTxt').textContent = bn(done.size) + ' / ' + bn(total);
+}
+document.getElementById('mStep').textContent = bn(STEPS.length);
+document.getElementById('resetBtn').onclick = () => {
+  done.clear(); save(); updateProgress();
+  document.querySelectorAll('.step.done').forEach(s => s.classList.remove('done'));
+};
+updateProgress();
+
+const tb = document.getElementById('themeBtn');
+tb.onclick = () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : cur === 'light' ? '' : 'dark';
+  if (next) document.documentElement.setAttribute('data-theme', next);
+  else document.documentElement.removeAttribute('data-theme');
+  try { localStorage.setItem('pf-theme', next); } catch (e) {}
+};
+try { const t = localStorage.getItem('pf-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+</script>
+</body>
+</html>

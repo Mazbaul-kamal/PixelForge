@@ -1,0 +1,142 @@
+.pf-panels {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pf-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-bottom: 1px solid var(--pf-line);
+}
+
+.pf-panel--history {
+  flex: 1;
+  min-height: 120px;
+}
+
+.pf-panel-title {
+  margin: 0;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pf-text-dim);
+  background: var(--pf-bg-chrome);
+  border-bottom: 1px solid var(--pf-line);
+}
+
+.pf-panel-body {
+  min-height: 0;
+  padding: 8px 10px;
+  overflow: auto;
+}
+
+.pf-panel--history .pf-panel-body {
+  padding: 4px 0;
+}
+
+/* ---- fields ---- */
+.pf-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.pf-field:last-child {
+  margin-bottom: 0;
+}
+
+.pf-field-label {
+  flex: 0 0 52px;
+  color: var(--pf-text-dim);
+}
+
+.pf-field-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-field-value {
+  flex: 0 0 40px;
+  text-align: right;
+  font-family: var(--pf-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--pf-text);
+}
+
+.pf-select {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  color: var(--pf-text);
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+  font: inherit;
+}
+
+.pf-select:focus-visible,
+.pf-range:focus-visible,
+.pf-history-row:focus-visible {
+  outline: 1px solid var(--pf-accent);
+  outline-offset: -1px;
+}
+
+.pf-range {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--pf-accent);
+}
+
+.pf-select:disabled,
+.pf-range:disabled {
+  opacity: 0.45;
+}
+
+/* ---- history list ---- */
+.pf-history-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.pf-history-row {
+  display: block;
+  width: 100%;
+  padding: 4px 10px;
+  text-align: left;
+  font: inherit;
+  color: var(--pf-text);
+  background: none;
+  border: 0;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pf-history-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.pf-history-row.is-undone {
+  color: var(--pf-text-dim);
+  opacity: 0.5;
+}
+
+.pf-history-row.is-current {
+  background: rgba(76, 159, 254, 0.16);
+  border-left-color: var(--pf-accent);
+  color: var(--pf-text);
+  opacity: 1;
+}
