@@ -305,3 +305,22 @@ export function alignLayerToDocument(
     }
   });
 }
+
+/**
+ * Bakes a text or shape layer's bitmap and drops the vector data, turning it
+ * into an ordinary raster layer. Undo restores it, but nothing else will.
+ */
+export function rasteriseLayer(
+  doc: PixelDocument,
+  history: History,
+  id: string,
+): boolean {
+  const layer = doc.getLayer(id);
+  if (!layer || (layer.type !== 'text' && layer.type !== 'shape')) return false;
+
+  return history.transaction('Rasterise Layer', () => {
+    layer.type = 'raster';
+    delete layer.text;
+    delete layer.shape;
+  });
+}

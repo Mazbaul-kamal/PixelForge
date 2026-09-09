@@ -38,7 +38,10 @@ const CROP_ICON =
 
 const TEXT_ICON = '<path d="M4 4.5h12"/><path d="M10 4.5v11"/><path d="M7.5 15.5h5"/>';
 
+const SHAPE_ICON = '<rect x="3" y="5" width="9" height="9" rx="1.5"/><circle cx="13.5" cy="12.5" r="4"/>';
+
 const ICONS: Record<string, string> = {
+  shape: SHAPE_ICON,
   text: TEXT_ICON,
   crop: CROP_ICON,
   eyedropper: EYEDROPPER_ICON,

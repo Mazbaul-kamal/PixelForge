@@ -46,6 +46,7 @@ export function blendModeToComposite(mode: BlendMode): GlobalCompositeOperation 
   return mode === 'normal' ? 'source-over' : mode;
 }
 
+import type { ShapeData } from './shape-layer';
 import type { TextLayerData } from './text-layer';
 
 /** Raster is the only kind step 1 creates; the others are produced by later steps. */
@@ -84,4 +85,6 @@ export interface Layer {
    * its style stay editable. Immutable: edits replace the whole object.
    */
   text?: TextLayerData;
+  /** Set on shape layers. Geometry, from which the bitmap is rendered. */
+  shape?: ShapeData;
 }

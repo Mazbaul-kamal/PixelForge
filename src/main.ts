@@ -17,6 +17,7 @@ import { fillThroughMasks, patternPaint, solidPaint } from './core/fill-ops';
 import { FloodRunner } from './core/flood-runner';
 import { cloneGradient, gradientPresets } from './core/gradient';
 import type { GradientDefinition } from './core/gradient';
+import { rasteriseLayer } from './core/layer-ops';
 import { builtInPatterns, patternFromSelection } from './core/patterns';
 import type { PatternDefinition } from './core/patterns';
 import { SelectionMask } from './core/selection';
@@ -24,6 +25,7 @@ import { deselect, invertSelection, selectAll, setSelection } from './core/selec
 import { createLassoTool } from './tools/lasso-tool';
 import { createBucketTool } from './tools/bucket-tool';
 import { createCropTool } from './tools/crop-tool';
+import { createShapeTool } from './tools/shape-tool';
 import { createTextTool } from './tools/text-tool';
 import { createEyedropperTool } from './tools/eyedropper-tool';
 import { createGradientTool } from './tools/gradient-tool';
@@ -45,6 +47,7 @@ import { buildMenuBar } from './ui/menubar';
 import { attachColourShortcuts } from './ui/colour-shortcuts';
 import { ColourSwatches } from './ui/colour-swatches';
 import { BusyIndicator } from './ui/busy-indicator';
+import { confirmDialog } from './ui/dialog';
 import { openFillDialog } from './ui/dialogs/fill-dialog';
 import { openGradientEditor } from './ui/dialogs/gradient-editor';
 import { openTextEditor } from './ui/text-editor-overlay';
@@ -309,6 +312,15 @@ function boot(): void {
   );
 
   toolManager.register(
+    createShapeTool({
+      onChanged: () => {
+        thumbnails.markAllDirty();
+        documentChanged();
+      },
+    }),
+  );
+
+  toolManager.register(
     createCropTool({
       onCommitted: () => {
         thumbnails.markAllDirty();
@@ -418,6 +430,32 @@ function boot(): void {
         { label: 'New…', shortcut: 'Ctrl+N', run: () => fileActions.newDocument() },
         { label: 'Open…', shortcut: 'Ctrl+O', run: () => fileActions.chooseFiles() },
         { label: 'Export As…', shortcut: 'Ctrl+Shift+S', run: () => fileActions.exportImage() },
+      ],
+    },
+    {
+      label: 'Layer',
+      items: [
+        {
+          label: 'Rasterise Layer',
+          run: () => {
+            const layer = doc.getActiveLayer();
+            if (!layer || (layer.type !== 'text' && layer.type !== 'shape')) {
+              notices.show('Nothing to rasterise.', 'Only text and shape layers carry vector data.');
+              return;
+            }
+            void confirmDialog(
+              'Rasterise this layer?',
+              `“${layer.name}” will become ordinary pixels and its ${layer.type} data will be ` +
+                'discarded. Only undo can bring it back.',
+              'Rasterise',
+            ).then((accepted) => {
+              if (!accepted) return;
+              rasteriseLayer(doc, history, layer.id);
+              thumbnails.markAllDirty();
+              documentChanged();
+            });
+          },
+        },
       ],
     },
     {
