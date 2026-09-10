@@ -26,6 +26,8 @@ import {
   addMask, addMaskFromSelection, applyMask, deleteMask,
 } from './core/mask-ops';
 import { builtInPatterns, patternFromSelection } from './core/patterns';
+import { Autosave } from './core/autosave';
+import { ProjectStore } from './core/project-store';
 import { buildPsd } from './core/psd-export';
 import type { PatternDefinition } from './core/patterns';
 import { SelectionMask } from './core/selection';
@@ -65,6 +67,7 @@ import { openFillDialog } from './ui/dialogs/fill-dialog';
 import { ADJUSTMENT_KINDS, openAdjustment } from './ui/adjustment-commands';
 import { openGradientEditor } from './ui/dialogs/gradient-editor';
 import { FILTER_KINDS, openFilter } from './ui/filter-commands';
+import { ProjectCommands } from './ui/project-commands';
 import { openTextEditor } from './ui/text-editor-overlay';
 import { NoticeStack } from './ui/notice';
 import { OptionsBar } from './ui/options-bar';
@@ -205,7 +208,8 @@ function boot(): void {
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     const key = event.key.toLowerCase();
 
-    if (key === 'n' && !event.shiftKey) fileActions.newDocument();
+    if (key === 's' && !event.shiftKey) void projects.save();
+    else if (key === 'n' && !event.shiftKey) fileActions.newDocument();
     else if (key === 'o') fileActions.chooseFiles();
     else if (key === 's' && event.shiftKey) fileActions.exportImage();
     else return;
@@ -512,6 +516,44 @@ function boot(): void {
     notify: (title: string, detail?: string) => notices.show(title, detail),
   };
 
+  // ---- local persistence ----
+  const projectStore = new ProjectStore();
+  const projects = new ProjectCommands({
+    doc, history, viewport, store: projectStore,
+    composite: () => { compositor.composeIfDirty(); return compositor.canvas; },
+    onRestored: () => {
+      thumbnails.markAllDirty();
+      compositor.syncSize();
+      statusBar.setDocumentSize(doc.width, doc.height);
+      renderer.invalidate();
+      documentChanged();
+      unsavedGuard.markSaved();
+    },
+    notify: (title, detail) => notices.show(title, detail),
+    warn: (title, detail) => notices.error(title, detail),
+    track,
+  });
+  projects.attachAutosave(
+    new Autosave({
+      doc, store: projectStore,
+      projectId: () => projects.projectId,
+      viewport: () => ({ zoom: viewport.zoom, panX: viewport.panX, panY: viewport.panY }),
+      composite: () => { compositor.composeIfDirty(); return compositor.canvas; },
+      onError: (message) => notices.error('Automatic save failed.', message),
+    }),
+  );
+
+  const projectZipPicker = document.createElement('input');
+  projectZipPicker.type = 'file';
+  projectZipPicker.accept = '.zip';
+  projectZipPicker.hidden = true;
+  projectZipPicker.addEventListener('change', () => {
+    const file = projectZipPicker.files?.[0];
+    if (file) void projects.importZip(file);
+    projectZipPicker.value = '';
+  });
+  document.body.appendChild(projectZipPicker);
+
   buildMenuBar(shell.menuBar, [
     {
       label: 'File',
@@ -519,6 +561,17 @@ function boot(): void {
         { label: 'New…', shortcut: 'Ctrl+N', run: () => fileActions.newDocument() },
         { label: 'Open…', shortcut: 'Ctrl+O', run: () => fileActions.chooseFiles() },
         { label: 'Open Folder as Layers…', run: () => fileActions.chooseFolder() },
+        { label: 'Save Project', shortcut: 'Ctrl+S', run: () => void projects.save() },
+        {
+          label: 'Save Project As…',
+          run: () => {
+            const name = window.prompt('Save this project as', doc.name || 'Untitled');
+            if (name !== null) void projects.saveAs(name);
+          },
+        },
+        { label: 'Projects…', run: () => void projects.browse() },
+        { label: 'Export Project (.zip)…', run: () => void projects.exportZip() },
+        { label: 'Import Project (.zip)…', run: () => projectZipPicker.click() },
         { label: 'Export As…', shortcut: 'Ctrl+Shift+S', run: () => fileActions.exportImage() },
         {
           label: 'Export as PSD…',
@@ -683,6 +736,9 @@ function boot(): void {
       ],
     },
   ]);
+
+  // Offer any unsaved work left behind by a closed tab, never silently.
+  void projects.offerRecovery();
 
   renderer.start();
 }

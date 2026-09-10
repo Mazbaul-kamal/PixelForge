@@ -289,3 +289,57 @@
   cursor: crosshair;
   touch-action: none;
 }
+
+/* ---- project browser ---- */
+.pf-project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 420px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.pf-project-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line);
+  border-radius: 4px;
+}
+
+.pf-project-thumb {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  background: #2a2a2a;
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.pf-project-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.pf-project-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-project-name {
+  color: var(--pf-text);
+}
+
+.pf-project-meta {
+  color: var(--pf-text-dim);
+  font-size: 11px;
+}
+
+.pf-warning {
+  color: #e5a04c;
+}
