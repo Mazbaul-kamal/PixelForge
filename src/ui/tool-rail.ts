@@ -45,7 +45,16 @@ const CLONE_ICON =
 const HEAL_ICON =
   '<path d="M10 4v12"/><path d="M4 10h12"/><circle cx="10" cy="10" r="7.2" stroke-dasharray="2.5 2"/>';
 
+const DODGE_ICON = '<circle cx="9" cy="9" r="5"/><path d="M12.5 12.5 17 17"/>';
+const BURN_ICON =
+  '<path d="M10 3c2.6 3 4.5 5.2 4.5 8a4.5 4.5 0 0 1-9 0c0-1.6.8-3 2-4.4"/>';
+const SMUDGE_ICON =
+  '<path d="M6 15.5c0-3 2-4.5 4-6.5s3-3.5 3-5"/><circle cx="6" cy="16" r="1.8"/>';
+
 const ICONS: Record<string, string> = {
+  dodge: DODGE_ICON,
+  burn: BURN_ICON,
+  smudge: SMUDGE_ICON,
   'clone-stamp': CLONE_ICON,
   'spot-healing': HEAL_ICON,
   shape: SHAPE_ICON,

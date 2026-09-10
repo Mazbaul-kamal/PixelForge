@@ -25,6 +25,15 @@ export interface StrokeSample {
   readonly pressure: number;
 }
 
+/** One stamp along the path, for tools that paint pixels themselves. */
+export interface Dab {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  /** 0..1, the flow and pressure weighting for this dab. */
+  readonly alpha: number;
+}
+
 /** Dabs smaller than this cannot be seen and are not worth stamping. */
 const MIN_RADIUS = 0.35;
 /** Never advance by less than this, or a stroke can stall in a loop. */
@@ -52,6 +61,15 @@ export class StrokeEngine {
   /** Distance still to travel before the next dab. */
   private toNextDab = 0;
   private painted = false;
+
+  /**
+   * When set, the engine reports dabs instead of stamping them.
+   *
+   * Dodge, burn and smudge read the layer as they paint, so they cannot use a
+   * deferred buffer; they still want the engine's spacing, smoothing and
+   * pressure handling, and do the painting themselves.
+   */
+  onDab: ((dab: Dab) => void) | null = null;
 
   constructor(ctx: CanvasRenderingContext2D, settings: BrushSettings) {
     this.ctx = ctx;
@@ -156,6 +174,12 @@ export class StrokeEngine {
     const alpha =
       this.settings.flow * (this.settings.pressureOpacity ? sample.pressure : 1);
     if (alpha <= 0) return;
+
+    if (this.onDab) {
+      this.onDab({ x: sample.x, y: sample.y, radius, alpha: Math.min(alpha, 1) });
+      this.painted = true;
+      return;
+    }
 
     const { ctx } = this;
     ctx.save();

@@ -26,6 +26,8 @@ import { createLassoTool } from './tools/lasso-tool';
 import { createBucketTool } from './tools/bucket-tool';
 import { createCropTool } from './tools/crop-tool';
 import { createCloneStampTool } from './tools/clone-stamp-tool';
+import { createDodgeBurnTool } from './tools/dodge-burn-tool';
+import { createSmudgeTool } from './tools/smudge-tool';
 import { createShapeTool } from './tools/shape-tool';
 import { createSpotHealingTool } from './tools/spot-healing-tool';
 import { createTextTool } from './tools/text-tool';
@@ -319,6 +321,13 @@ function boot(): void {
       notify: (title, detail) => notices.show(title, detail),
     }),
   );
+
+  const pixelBrushDeps = {
+    onChanged: () => { thumbnails.markAllDirty(); documentChanged(); },
+  };
+  toolManager.register(createDodgeBurnTool('dodge', pixelBrushDeps));
+  toolManager.register(createDodgeBurnTool('burn', pixelBrushDeps));
+  toolManager.register(createSmudgeTool(pixelBrushDeps));
 
   toolManager.register(
     createSpotHealingTool({
