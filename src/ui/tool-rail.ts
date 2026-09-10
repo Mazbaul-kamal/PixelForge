@@ -40,7 +40,14 @@ const TEXT_ICON = '<path d="M4 4.5h12"/><path d="M10 4.5v11"/><path d="M7.5 15.5
 
 const SHAPE_ICON = '<rect x="3" y="5" width="9" height="9" rx="1.5"/><circle cx="13.5" cy="12.5" r="4"/>';
 
+const CLONE_ICON =
+  '<rect x="6" y="7.5" width="9" height="9" rx="1"/><path d="M5 12.5H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/>';
+const HEAL_ICON =
+  '<path d="M10 4v12"/><path d="M4 10h12"/><circle cx="10" cy="10" r="7.2" stroke-dasharray="2.5 2"/>';
+
 const ICONS: Record<string, string> = {
+  'clone-stamp': CLONE_ICON,
+  'spot-healing': HEAL_ICON,
   shape: SHAPE_ICON,
   text: TEXT_ICON,
   crop: CROP_ICON,

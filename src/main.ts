@@ -25,7 +25,9 @@ import { deselect, invertSelection, selectAll, setSelection } from './core/selec
 import { createLassoTool } from './tools/lasso-tool';
 import { createBucketTool } from './tools/bucket-tool';
 import { createCropTool } from './tools/crop-tool';
+import { createCloneStampTool } from './tools/clone-stamp-tool';
 import { createShapeTool } from './tools/shape-tool';
+import { createSpotHealingTool } from './tools/spot-healing-tool';
 import { createTextTool } from './tools/text-tool';
 import { createEyedropperTool } from './tools/eyedropper-tool';
 import { createGradientTool } from './tools/gradient-tool';
@@ -308,6 +310,22 @@ function boot(): void {
         thumbnails.markAllDirty();
         documentChanged();
       },
+    }),
+  );
+
+  toolManager.register(
+    createCloneStampTool({
+      onChanged: () => { thumbnails.markAllDirty(); documentChanged(); },
+      notify: (title, detail) => notices.show(title, detail),
+    }),
+  );
+
+  toolManager.register(
+    createSpotHealingTool({
+      onChanged: () => { thumbnails.markAllDirty(); documentChanged(); },
+      notify: (title, detail) => notices.show(title, detail),
+      warn: (title, detail) => notices.error(title, detail),
+      track,
     }),
   );
 
