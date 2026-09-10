@@ -1,5 +1,6 @@
 import type { PixelDocument } from './document';
 import type { SelectionMask } from './selection';
+import type { AdjustmentData } from './adjustments';
 import type { ShapeData } from './shape-layer';
 import type { TextLayerData } from './text-layer';
 import type { BlendMode, Layer, LayerType } from './types';
@@ -41,6 +42,7 @@ interface LayerRecord {
   readonly clipped: boolean;
   readonly text: TextLayerData | undefined;
   readonly shape: ShapeData | undefined;
+  readonly adjustment: AdjustmentData | undefined;
 }
 
 /** The layer list, layer properties and document size. No bitmaps are copied. */
@@ -119,6 +121,7 @@ export function captureDocument(doc: PixelDocument): DocumentSnapshot {
       clipped: layer.clipped === true,
       text: layer.text,
       shape: layer.shape,
+      adjustment: layer.adjustment,
     })),
   };
 }
@@ -156,6 +159,8 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
     else delete layer.text;
     if (record.shape) layer.shape = record.shape;
     else delete layer.shape;
+    if (record.adjustment) layer.adjustment = record.adjustment;
+    else delete layer.adjustment;
 
     if (layer.canvas !== record.canvas) {
       const ctx = record.canvas.getContext('2d');
@@ -188,6 +193,7 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
   rebuilt.clipped = record.clipped;
   if (record.text) rebuilt.text = record.text;
   if (record.shape) rebuilt.shape = record.shape;
+  if (record.adjustment) rebuilt.adjustment = record.adjustment;
   return rebuilt;
 }
 
@@ -222,7 +228,8 @@ export function documentSnapshotsEqual(a: DocumentSnapshot, b: DocumentSnapshot)
       left.maskLinked !== right.maskLinked ||
       left.clipped !== right.clipped ||
       left.text !== right.text ||
-      left.shape !== right.shape
+      left.shape !== right.shape ||
+      left.adjustment !== right.adjustment
     ) {
       return false;
     }

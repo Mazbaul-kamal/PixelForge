@@ -14,6 +14,9 @@ import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
 import { createBrushTool } from './tools/brush-tool';
 import { fillThroughMasks, patternPaint, solidPaint } from './core/fill-ops';
+import { ADJUSTMENT_NAMES } from './core/adjustments';
+import { FilterRunner } from './core/filter-runner';
+import { FILTER_NAMES } from './core/filters';
 import { FloodRunner } from './core/flood-runner';
 import { cloneGradient, gradientPresets } from './core/gradient';
 import type { GradientDefinition } from './core/gradient';
@@ -57,7 +60,9 @@ import { ColourSwatches } from './ui/colour-swatches';
 import { BusyIndicator } from './ui/busy-indicator';
 import { confirmDialog } from './ui/dialog';
 import { openFillDialog } from './ui/dialogs/fill-dialog';
+import { ADJUSTMENT_KINDS, openAdjustment } from './ui/adjustment-commands';
 import { openGradientEditor } from './ui/dialogs/gradient-editor';
+import { FILTER_KINDS, openFilter } from './ui/filter-commands';
 import { openTextEditor } from './ui/text-editor-overlay';
 import { NoticeStack } from './ui/notice';
 import { OptionsBar } from './ui/options-bar';
@@ -483,6 +488,26 @@ function boot(): void {
     waitForSize.observe(shell.stage);
   }
 
+  const filterRunner = new FilterRunner();
+  const adjustmentDeps = {
+    doc, history, compositor,
+    onChanged: () => { thumbnails.markAllDirty(); documentChanged(); },
+  };
+  const filterDeps = {
+    doc, history, runner: filterRunner,
+    visibleRect: () => {
+      const topLeft = viewport.screenToDoc(0, 0);
+      const bottomRight = viewport.screenToDoc(viewport.viewWidth, viewport.viewHeight);
+      return {
+        x: topLeft.x, y: topLeft.y,
+        width: Math.max(1, bottomRight.x - topLeft.x),
+        height: Math.max(1, bottomRight.y - topLeft.y),
+      };
+    },
+    onChanged: () => { thumbnails.markAllDirty(); documentChanged(); },
+    notify: (title: string, detail?: string) => notices.show(title, detail),
+  };
+
   buildMenuBar(shell.menuBar, [
     {
       label: 'File',
@@ -563,6 +588,17 @@ function boot(): void {
           },
         },
         {
+          label: 'Edit Adjustment…',
+          run: () => {
+            const layer = doc.getActiveLayer();
+            if (!layer || layer.type !== 'adjustment' || !layer.adjustment) {
+              notices.show('That is not an adjustment layer.');
+              return;
+            }
+            openAdjustment(adjustmentDeps, layer.adjustment.kind, layer);
+          },
+        },
+        {
           label: 'Rasterise Layer',
           run: () => {
             const layer = doc.getActiveLayer();
@@ -591,6 +627,20 @@ function boot(): void {
         { label: 'Fill…', shortcut: 'Shift+F5', run: runFillCommand },
         { label: 'Define Pattern', run: definePattern },
       ],
+    },
+    {
+      label: 'Adjust',
+      items: ADJUSTMENT_KINDS.map((kind) => ({
+        label: ADJUSTMENT_NAMES[kind],
+        run: () => openAdjustment(adjustmentDeps, kind),
+      })),
+    },
+    {
+      label: 'Filter',
+      items: FILTER_KINDS.map((kind) => ({
+        label: `${FILTER_NAMES[kind]}…`,
+        run: () => openFilter(filterDeps, kind),
+      })),
     },
     {
       label: 'Select',

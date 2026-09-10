@@ -1,3 +1,4 @@
+import { createAdjustment } from './adjustments';
 import type { PixelDocument } from './document';
 import type { Layer } from './types';
 import { blendModeToComposite } from './types';
@@ -21,13 +22,15 @@ export interface LiveStroke {
   readonly target?: 'layer' | 'mask';
 }
 
+function isAdjustment(layer: Layer): boolean {
+  return layer.type === 'adjustment' && layer.adjustment !== undefined;
+}
+
 function isDrawable(layer: Layer): boolean {
-  return (
-    layer.visible &&
-    layer.opacity > 0 &&
-    layer.canvas.width > 0 &&
-    layer.canvas.height > 0
-  );
+  if (!layer.visible || layer.opacity <= 0) return false;
+  // An adjustment layer has no bitmap of its own but still takes part.
+  if (isAdjustment(layer)) return true;
+  return layer.canvas.width > 0 && layer.canvas.height > 0;
 }
 
 export function hasActiveMask(layer: Layer): boolean {
@@ -126,7 +129,7 @@ export function drawLayers(
   const previousComposite = ctx.globalCompositeOperation;
 
   for (const layer of layers) {
-    if (!isDrawable(layer)) continue;
+    if (!isDrawable(layer) || isAdjustment(layer)) continue;
     ctx.globalAlpha = Math.min(Math.max(layer.opacity, 0), 1);
     ctx.globalCompositeOperation = blendModeToComposite(layer.blendMode);
     ctx.drawImage(surfaceFor(layer), layer.x - offsetX, layer.y - offsetY);
@@ -290,8 +293,14 @@ export class Compositor {
         next++;
       }
 
-      if (clipped.length === 0) this.drawSingle(base);
-      else this.drawClippingGroup(base, clipped);
+      if (isAdjustment(base)) {
+        // Transforms everything composited so far, inside its own mask.
+        this.applyAdjustmentLayer(this.ctx, this.canvas.width, this.canvas.height, base);
+      } else if (clipped.length === 0) {
+        this.drawSingle(base);
+      } else {
+        this.drawClippingGroup(base, clipped);
+      }
 
       index = next;
     }
@@ -330,6 +339,12 @@ export class Compositor {
     groupCtx.drawImage(baseSurface, base.x, base.y);
 
     for (const layer of clipped) {
+      if (isAdjustment(layer)) {
+        // A clipped adjustment only reaches the group it belongs to.
+        this.applyAdjustmentLayer(groupCtx, group.width, group.height, layer);
+        continue;
+      }
+
       const trimmed = document.createElement('canvas');
       trimmed.width = group.width;
       trimmed.height = group.height;
@@ -354,6 +369,69 @@ export class Compositor {
     ctx.drawImage(group, 0, 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /**
+   * Runs an adjustment over whatever has been composited into `target`.
+   *
+   * The pixels are read back, transformed and blended in by the layer's
+   * opacity and its mask coverage, so nothing is baked and turning the layer
+   * off recomposites from the original pixels with no accumulated drift.
+   */
+  private applyAdjustmentLayer(
+    target: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    layer: Layer,
+  ): void {
+    if (!layer.adjustment) return;
+
+    // Only the masked region needs touching.
+    let left = 0;
+    let top = 0;
+    let region = { width, height };
+    if (hasActiveMask(layer) && layer.mask) {
+      left = Math.max(0, layer.x);
+      top = Math.max(0, layer.y);
+      region = {
+        width: Math.min(width - left, layer.mask.width),
+        height: Math.min(height - top, layer.mask.height),
+      };
+    }
+    if (region.width <= 0 || region.height <= 0) return;
+
+    const image = target.getImageData(left, top, region.width, region.height);
+    const original = new Uint8ClampedArray(image.data);
+
+    createAdjustment(layer.adjustment).apply(image.data);
+
+    const opacity = Math.min(Math.max(layer.opacity, 0), 1);
+    let coverage: Uint8ClampedArray | null = null;
+    if (hasActiveMask(layer) && layer.mask) {
+      const alpha = maskAsAlpha(layer.mask);
+      const maskCtx = alpha.getContext('2d', { willReadFrequently: true });
+      if (maskCtx) {
+        coverage = maskCtx.getImageData(
+          left - layer.x, top - layer.y, region.width, region.height,
+        ).data;
+      }
+    }
+
+    const data = image.data;
+    for (let i = 0, p = 0; i < data.length; i += 4, p += 4) {
+      let strength = opacity;
+      if (coverage) strength *= coverage[p + 3]! / 255;
+      if (strength >= 1) continue;
+      if (strength <= 0) {
+        for (let c = 0; c < 4; c++) data[i + c] = original[i + c]!;
+        continue;
+      }
+      for (let c = 0; c < 3; c++) {
+        data[i + c] = original[i + c]! + (data[i + c]! - original[i + c]!) * strength;
+      }
+    }
+
+    target.putImageData(image, left, top);
   }
 
   private ensureScratch(width: number, height: number): HTMLCanvasElement {

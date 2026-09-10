@@ -46,6 +46,7 @@ export function blendModeToComposite(mode: BlendMode): GlobalCompositeOperation 
   return mode === 'normal' ? 'source-over' : mode;
 }
 
+import type { AdjustmentData } from './adjustments';
 import type { ShapeData } from './shape-layer';
 import type { TextLayerData } from './text-layer';
 
@@ -96,4 +97,9 @@ export interface Layer {
   text?: TextLayerData;
   /** Set on shape layers. Geometry, from which the bitmap is rendered. */
   shape?: ShapeData;
+  /**
+   * Set on adjustment layers, which carry no bitmap and instead transform
+   * everything composited beneath them.
+   */
+  adjustment?: AdjustmentData;
 }

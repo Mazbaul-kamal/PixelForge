@@ -246,3 +246,46 @@
 .pf-picker-recent:hover {
   border-color: var(--pf-accent);
 }
+
+.pf-dialog-extras {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--pf-line);
+}
+
+.pf-dialog-extras .pf-field-label {
+  flex: 0 0 auto;
+}
+
+.pf-dialog-extras .pf-button {
+  margin-left: auto;
+}
+
+.pf-dialog-busy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--pf-text-dim);
+}
+
+.pf-histogram {
+  display: block;
+  width: 100%;
+  height: 80px;
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+}
+
+.pf-curve-editor {
+  display: block;
+  width: 220px;
+  height: 220px;
+  background: var(--pf-bg-sunken);
+  border: 1px solid var(--pf-line-strong);
+  cursor: crosshair;
+  touch-action: none;
+}
