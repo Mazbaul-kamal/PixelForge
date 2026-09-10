@@ -29,6 +29,7 @@ export interface LayerRowCallbacks {
   /** Shift+click a mask disables it, Alt+click views it alone. */
   onMaskModifier: (id: string, modifier: 'toggle' | 'view') => void;
   onToggleMaskLink: (id: string) => void;
+  onToggleGroup: (id: string) => void;
 }
 
 export interface LayerRowState {
@@ -36,6 +37,8 @@ export interface LayerRowState {
   selected: boolean;
   /** Which surface of THIS layer painting targets, when it is active. */
   target: 'layer' | 'mask';
+  /** How deep inside groups this layer sits, for the indent. */
+  depth: number;
 }
 
 /** One row of the layers list. Rebuilt only when the layer list changes. */
@@ -47,6 +50,7 @@ export class LayerRow {
   private readonly maskHost: HTMLElement;
   private readonly maskCanvas: HTMLCanvasElement;
   private readonly linkButton: HTMLButtonElement;
+  private readonly disclosure: HTMLButtonElement;
   private readonly nameEl: HTMLElement;
   private readonly badge: HTMLElement;
   private readonly eyeButton: HTMLButtonElement;
@@ -65,6 +69,14 @@ export class LayerRow {
     this.root.dataset['layerId'] = layer.id;
     this.root.setAttribute('role', 'option');
     this.root.tabIndex = -1;
+
+    this.disclosure = document.createElement('button');
+    this.disclosure.type = 'button';
+    this.disclosure.className = 'pf-layer-disclosure';
+    this.disclosure.addEventListener('click', (event) => {
+      event.stopPropagation();
+      callbacks.onToggleGroup(this.id);
+    });
 
     this.eyeButton = document.createElement('button');
     this.eyeButton.type = 'button';
@@ -132,7 +144,8 @@ export class LayerRow {
     });
 
     this.root.append(
-      this.eyeButton, this.thumbHost, this.linkButton, this.maskHost, meta, this.lockButton,
+      this.disclosure, this.eyeButton, this.thumbHost, this.linkButton, this.maskHost,
+      meta, this.lockButton,
     );
 
     this.root.addEventListener('click', (event) => {
@@ -144,7 +157,7 @@ export class LayerRow {
       this.beginRename();
     });
 
-    this.update(layer, { active: false, selected: false, target: 'layer' });
+    this.update(layer, { active: false, selected: false, target: 'layer', depth: 0 });
   }
 
   update(layer: Layer, state: LayerRowState): void {
@@ -157,6 +170,14 @@ export class LayerRow {
     this.root.classList.toggle('is-hidden', !layer.visible);
     this.root.classList.toggle('is-locked', layer.locked);
     this.root.classList.toggle('is-clipped', layer.clipped === true);
+    this.root.style.setProperty('--depth', String(state.depth));
+
+    const isGroup = layer.type === 'group';
+    this.disclosure.hidden = !isGroup;
+    if (isGroup) {
+      this.disclosure.textContent = layer.collapsed === true ? '▸' : '▾';
+      this.disclosure.title = layer.collapsed === true ? 'Expand group' : 'Collapse group';
+    }
 
     // ---- mask ----
     const hasMask = layer.mask !== undefined;

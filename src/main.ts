@@ -13,6 +13,7 @@ import { History } from './core/history';
 import { createLayer } from './core/layer';
 import { Viewport } from './core/viewport';
 import { createBrushTool } from './tools/brush-tool';
+import { downloadBlob } from './core/export';
 import { fillThroughMasks, patternPaint, solidPaint } from './core/fill-ops';
 import { ADJUSTMENT_NAMES } from './core/adjustments';
 import { FilterRunner } from './core/filter-runner';
@@ -25,6 +26,7 @@ import {
   addMask, addMaskFromSelection, applyMask, deleteMask,
 } from './core/mask-ops';
 import { builtInPatterns, patternFromSelection } from './core/patterns';
+import { buildPsd } from './core/psd-export';
 import type { PatternDefinition } from './core/patterns';
 import { SelectionMask } from './core/selection';
 import { deselect, invertSelection, selectAll, setSelection } from './core/selection-ops';
@@ -145,6 +147,10 @@ function boot(): void {
   // ---- files in and out ----
   const unsavedGuard = new UnsavedGuard(history);
 
+  const busy = new BusyIndicator(document.body);
+  const floodRunner = new FloodRunner();
+  const track = <T,>(label: string, work: Promise<T>): Promise<T> => busy.during(label, work);
+
   const fileActions = new FileActions({
     doc,
     history,
@@ -155,6 +161,7 @@ function boot(): void {
       viewport.fitToScreen(doc.width, doc.height);
     },
     onSaved: () => unsavedGuard.markSaved(),
+    track,
   });
 
   /** Grow and Similar both rescan the image against the current selection. */
@@ -265,9 +272,6 @@ function boot(): void {
   toolManager.register(createLassoTool());
   toolManager.register(createPolygonLassoTool());
 
-  const busy = new BusyIndicator(document.body);
-  const floodRunner = new FloodRunner();
-  const track = <T,>(label: string, work: Promise<T>): Promise<T> => busy.during(label, work);
   toolManager.register(createMagicWandTool({ runner: floodRunner, track }));
 
   // Patterns are the built-in tiles plus anything defined from a selection.
@@ -514,7 +518,33 @@ function boot(): void {
       items: [
         { label: 'New…', shortcut: 'Ctrl+N', run: () => fileActions.newDocument() },
         { label: 'Open…', shortcut: 'Ctrl+O', run: () => fileActions.chooseFiles() },
+        { label: 'Open Folder as Layers…', run: () => fileActions.chooseFolder() },
         { label: 'Export As…', shortcut: 'Ctrl+Shift+S', run: () => fileActions.exportImage() },
+        {
+          label: 'Export as PSD…',
+          run: () => {
+            void (async () => {
+              try {
+                compositor.composeIfDirty();
+                const { writePsd } = await import('ag-psd');
+                const data = writePsd(
+                  buildPsd(doc, compositor.canvas) as never,
+                  { generateThumbnail: true },
+                );
+                const blob = new Blob([data], { type: 'image/vnd.adobe.photoshop' });
+                downloadBlob(blob, `${doc.name || 'Untitled'}.psd`);
+                unsavedGuard.markSaved();
+                notices.show(`Exported ${doc.name || 'Untitled'}.psd`,
+                  `${(blob.size / 1_000_000).toFixed(1)} MB with ${doc.layers.length} layers.`);
+              } catch (error) {
+                notices.error(
+                  'The PSD could not be written.',
+                  error instanceof Error ? error.message : 'Something went wrong while saving.',
+                );
+              }
+            })();
+          },
+        },
       ],
     },
     {

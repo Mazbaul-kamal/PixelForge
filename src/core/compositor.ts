@@ -22,14 +22,23 @@ export interface LiveStroke {
   readonly target?: 'layer' | 'mask';
 }
 
+function isGroup(layer: Layer): boolean {
+  return layer.type === 'group';
+}
+
+/** Layers directly inside `parentId`, bottom first. */
+export function childrenOf(layers: readonly Layer[], parentId: string | undefined): Layer[] {
+  return layers.filter((layer) => (layer.parentId ?? undefined) === parentId);
+}
+
 function isAdjustment(layer: Layer): boolean {
   return layer.type === 'adjustment' && layer.adjustment !== undefined;
 }
 
 function isDrawable(layer: Layer): boolean {
   if (!layer.visible || layer.opacity <= 0) return false;
-  // An adjustment layer has no bitmap of its own but still takes part.
-  if (isAdjustment(layer)) return true;
+  // Adjustment layers and groups have no bitmap of their own but still count.
+  if (isAdjustment(layer) || isGroup(layer)) return true;
   return layer.canvas.width > 0 && layer.canvas.height > 0;
 }
 
@@ -275,11 +284,23 @@ export class Compositor {
       }
     }
 
-    const layers = doc.layers;
-    let index = 0;
+    this.renderSiblings(ctx, this.canvas.width, this.canvas.height, childrenOf(doc.layers, undefined));
 
-    while (index < layers.length) {
-      const base = layers[index]!;
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    this.dirty = false;
+  }
+
+  /** Draws one level of the layer tree, bottom first. */
+  private renderSiblings(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    siblings: readonly Layer[],
+  ): void {
+    let index = 0;
+    while (index < siblings.length) {
+      const base = siblings[index]!;
       if (!isDrawable(base)) {
         index++;
         continue;
@@ -288,33 +309,57 @@ export class Compositor {
       // Gather the run of layers clipped to this one.
       const clipped: Layer[] = [];
       let next = index + 1;
-      while (next < layers.length && layers[next]!.clipped === true) {
-        if (isDrawable(layers[next]!)) clipped.push(layers[next]!);
+      while (next < siblings.length && siblings[next]!.clipped === true) {
+        if (isDrawable(siblings[next]!)) clipped.push(siblings[next]!);
         next++;
       }
 
       if (isAdjustment(base)) {
-        // Transforms everything composited so far, inside its own mask.
-        this.applyAdjustmentLayer(this.ctx, this.canvas.width, this.canvas.height, base);
+        this.applyAdjustmentLayer(ctx, width, height, base);
       } else if (clipped.length === 0) {
-        this.drawSingle(base);
+        this.drawSingle(ctx, base);
       } else {
-        this.drawClippingGroup(base, clipped);
+        this.drawClippingGroup(ctx, width, height, base, clipped);
       }
 
       index = next;
     }
-
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-    this.dirty = false;
   }
 
-  private drawSingle(layer: Layer): void {
-    const { ctx } = this;
+  /**
+   * A group renders its children into their own surface first, so the group's
+   * opacity and blend mode apply to the result as a whole rather than to each
+   * child separately — which is what makes a 50% group different from setting
+   * every child to 50%.
+   */
+  private renderGroup(layer: Layer, width: number, height: number): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return canvas;
+
+    this.renderSiblings(ctx, width, height, childrenOf(this.doc.layers, layer.id));
+
+    if (hasActiveMask(layer) && layer.mask) {
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.drawImage(maskAsAlpha(layer.mask), layer.x, layer.y);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    return canvas;
+  }
+
+  private drawSingle(ctx: CanvasRenderingContext2D, layer: Layer): void {
     ctx.globalAlpha = Math.min(Math.max(layer.opacity, 0), 1);
     ctx.globalCompositeOperation = blendModeToComposite(layer.blendMode);
-    ctx.drawImage(surfaceFor(layer, this.live ?? undefined), layer.x, layer.y);
+
+    if (isGroup(layer)) {
+      ctx.drawImage(this.renderGroup(layer, ctx.canvas.width, ctx.canvas.height), 0, 0);
+    } else {
+      ctx.drawImage(surfaceFor(layer, this.live ?? undefined), layer.x, layer.y);
+    }
+
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
@@ -324,11 +369,20 @@ export class Compositor {
    * to the base's alpha, then the whole group composites with the base's own
    * opacity and blend mode.
    */
-  private drawClippingGroup(base: Layer, clipped: readonly Layer[]): void {
-    const { ctx } = this;
-    const baseSurface = surfaceFor(base, this.live ?? undefined);
+  private drawClippingGroup(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    base: Layer,
+    clipped: readonly Layer[],
+  ): void {
+    const baseSurface = isGroup(base)
+      ? this.renderGroup(base, width, height)
+      : surfaceFor(base, this.live ?? undefined);
+    const baseX = isGroup(base) ? 0 : base.x;
+    const baseY = isGroup(base) ? 0 : base.y;
 
-    const group = this.ensureScratch(this.canvas.width, this.canvas.height);
+    const group = this.ensureScratch(width, height);
     const groupCtx = group.getContext('2d');
     if (!groupCtx) return;
 
@@ -336,7 +390,7 @@ export class Compositor {
     groupCtx.globalAlpha = 1;
     groupCtx.globalCompositeOperation = 'source-over';
     groupCtx.clearRect(0, 0, group.width, group.height);
-    groupCtx.drawImage(baseSurface, base.x, base.y);
+    groupCtx.drawImage(baseSurface, baseX, baseY);
 
     for (const layer of clipped) {
       if (isAdjustment(layer)) {
@@ -351,11 +405,15 @@ export class Compositor {
       const trimmedCtx = trimmed.getContext('2d');
       if (!trimmedCtx) continue;
 
-      trimmedCtx.drawImage(surfaceFor(layer, this.live ?? undefined), layer.x, layer.y);
+      if (isGroup(layer)) {
+        trimmedCtx.drawImage(this.renderGroup(layer, group.width, group.height), 0, 0);
+      } else {
+        trimmedCtx.drawImage(surfaceFor(layer, this.live ?? undefined), layer.x, layer.y);
+      }
       // Trimmed to the BASE's alpha, not to whatever the group has become, so
       // three clipped layers all clip to the same shape.
       trimmedCtx.globalCompositeOperation = 'destination-in';
-      trimmedCtx.drawImage(baseSurface, base.x, base.y);
+      trimmedCtx.drawImage(baseSurface, baseX, baseY);
 
       groupCtx.globalAlpha = Math.min(Math.max(layer.opacity, 0), 1);
       groupCtx.globalCompositeOperation = blendModeToComposite(layer.blendMode);

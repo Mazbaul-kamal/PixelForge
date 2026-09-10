@@ -2,6 +2,8 @@ import type { PixelDocument } from '../core/document';
 import { placeImages, resetDocument } from '../core/document-io';
 import type { NewDocumentOptions } from '../core/document-io';
 import { downloadBlob, exportFilename, renderExport } from '../core/export';
+import { importPsd } from '../core/psd-import';
+import { isPsdFile, PsdRunner } from '../core/psd-runner';
 import type { ExportOptions } from '../core/export';
 import type { History } from '../core/history';
 import {
@@ -29,6 +31,8 @@ export interface FileActionDeps {
   onDocumentResized: () => void;
   /** Called after a successful export, to clear the unsaved marker. */
   onSaved: () => void;
+  /** Wraps long operations so the UI can show progress. */
+  track: <T>(label: string, work: Promise<T>) => Promise<T>;
 }
 
 /**
@@ -38,6 +42,8 @@ export interface FileActionDeps {
 export class FileActions {
   private readonly deps: FileActionDeps;
   private readonly picker: HTMLInputElement;
+  private readonly folderPicker: HTMLInputElement;
+  private readonly psd = new PsdRunner();
 
   constructor(deps: FileActionDeps) {
     this.deps = deps;
@@ -53,10 +59,38 @@ export class FileActions {
       this.picker.value = '';
     });
     document.body.appendChild(this.picker);
+
+    // A folder of images opens as one layer per file.
+    this.folderPicker = document.createElement('input');
+    this.folderPicker.type = 'file';
+    this.folderPicker.multiple = true;
+    this.folderPicker.hidden = true;
+    this.folderPicker.setAttribute('webkitdirectory', '');
+    this.folderPicker.addEventListener('change', () => {
+      const files = this.folderPicker.files;
+      if (files && files.length > 0) {
+        const images = [...files]
+          .filter((file) => file.type.startsWith('image/'))
+          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        if (images.length === 0) {
+          this.deps.notices.error('No images in that folder.', 'Pick a folder containing PNG or JPEG files.');
+        } else {
+          void this.openFiles(images);
+        }
+      }
+      this.folderPicker.value = '';
+    });
+    document.body.appendChild(this.folderPicker);
+  }
+
+  chooseFolder(): void {
+    this.folderPicker.click();
   }
 
   destroy(): void {
     this.picker.remove();
+    this.folderPicker.remove();
+    this.psd.destroy();
   }
 
   chooseFiles(): void {
@@ -97,11 +131,37 @@ export class FileActions {
     const prepared: PreparedImage[] = [];
 
     for (const file of files) {
+      // PSD and PSB carry a whole document, so they replace rather than place.
+      if (isPsdFile(file)) {
+        await this.openPsd(file);
+        continue;
+      }
       const image = await this.prepareOne(file, fileBaseName(file.name));
       if (image) prepared.push(image);
     }
 
     this.place(prepared);
+  }
+
+  /** Opens a PSD or PSB, parsed off the main thread. */
+  private async openPsd(file: File): Promise<void> {
+    const { doc, history, notices } = this.deps;
+    const name = fileBaseName(file.name);
+
+    const parsed = await this.deps.track(`Reading ${file.name}…`, this.psd.parse(file));
+    if (parsed.error) {
+      notices.error(`“${file.name}” could not be opened.`, parsed.error);
+      return;
+    }
+
+    const report = importPsd(doc, history, parsed, name);
+    this.deps.onDocumentResized();
+    this.deps.onDocumentChanged();
+
+    notices.show(
+      `Opened ${name} with ${report.layerCount} layer${report.layerCount === 1 ? '' : 's'}.`,
+    );
+    for (const warning of report.warnings) notices.error('Note about this file', warning);
   }
 
   /** Handles a paste, which carries blobs with no filename. */

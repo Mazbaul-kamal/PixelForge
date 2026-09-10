@@ -67,6 +67,7 @@ export class LayersPanel {
   private maskViewId: string | null = null;
   onMaskViewChanged: ((layerId: string | null) => void) | null = null;
   private renderedOrder = '';
+  private rowDepths = new Map<string, number>();
   private opacityTx: Transaction | null = null;
   private readonly detachers: Array<() => void> = [];
 
@@ -236,8 +237,28 @@ export class LayersPanel {
 
   // ---- internals ----
 
+  /**
+   * The visible rows, top first, walking the group tree. Children of a
+   * collapsed group are left out of the list but stay in the document.
+   */
   private displayLayers(): Layer[] {
-    return [...this.doc.layers].reverse();
+    const rows: Layer[] = [];
+    const depths = new Map<string, number>();
+
+    const walk = (parentId: string | undefined, depth: number): void => {
+      const siblings = this.doc.layers.filter((l) => (l.parentId ?? undefined) === parentId);
+      // Top first, which is the reverse of the document's bottom-first order.
+      for (let i = siblings.length - 1; i >= 0; i--) {
+        const layer = siblings[i]!;
+        rows.push(layer);
+        depths.set(layer.id, depth);
+        if (layer.type === 'group' && layer.collapsed !== true) walk(layer.id, depth + 1);
+      }
+    };
+
+    walk(undefined, 0);
+    this.rowDepths = depths;
+    return rows;
   }
 
   /**
@@ -472,6 +493,13 @@ export class LayersPanel {
                 }
                 this.onChanged();
               },
+              onToggleGroup: (id) => {
+                const layer = this.doc.getLayer(id);
+                if (!layer || layer.type !== 'group') return;
+                layer.collapsed = layer.collapsed !== true;
+                this.renderedOrder = '';
+                this.render();
+              },
               onToggleMaskLink: (id) => {
                 const layer = this.doc.getLayer(id);
                 if (!layer) return;
@@ -493,6 +521,7 @@ export class LayersPanel {
         active: layer.id === this.doc.activeLayerId,
         selected: this.selected.has(layer.id),
         target: this.paintTarget,
+        depth: this.rowDepths.get(layer.id) ?? 0,
       });
     }
 

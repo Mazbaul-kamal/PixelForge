@@ -266,3 +266,28 @@
 .pf-layer-row {
   position: relative;
 }
+
+/* ---- groups ---- */
+.pf-layer-row {
+  padding-left: calc(8px + var(--depth, 0) * 14px);
+}
+
+.pf-layer-row.is-clipped {
+  padding-left: calc(20px + var(--depth, 0) * 14px);
+}
+
+.pf-layer-disclosure {
+  flex: 0 0 auto;
+  width: 12px;
+  padding: 0;
+  color: var(--pf-text-dim);
+  background: none;
+  border: 0;
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pf-layer-disclosure:hover {
+  color: var(--pf-text);
+}

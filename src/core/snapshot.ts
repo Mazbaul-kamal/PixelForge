@@ -43,6 +43,8 @@ interface LayerRecord {
   readonly text: TextLayerData | undefined;
   readonly shape: ShapeData | undefined;
   readonly adjustment: AdjustmentData | undefined;
+  readonly parentId: string | undefined;
+  readonly collapsed: boolean;
 }
 
 /** The layer list, layer properties and document size. No bitmaps are copied. */
@@ -122,6 +124,8 @@ export function captureDocument(doc: PixelDocument): DocumentSnapshot {
       text: layer.text,
       shape: layer.shape,
       adjustment: layer.adjustment,
+      parentId: layer.parentId,
+      collapsed: layer.collapsed === true,
     })),
   };
 }
@@ -161,6 +165,9 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
     else delete layer.shape;
     if (record.adjustment) layer.adjustment = record.adjustment;
     else delete layer.adjustment;
+    if (record.parentId) layer.parentId = record.parentId;
+    else delete layer.parentId;
+    layer.collapsed = record.collapsed;
 
     if (layer.canvas !== record.canvas) {
       const ctx = record.canvas.getContext('2d');
@@ -194,6 +201,8 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
   if (record.text) rebuilt.text = record.text;
   if (record.shape) rebuilt.shape = record.shape;
   if (record.adjustment) rebuilt.adjustment = record.adjustment;
+  if (record.parentId) rebuilt.parentId = record.parentId;
+  rebuilt.collapsed = record.collapsed;
   return rebuilt;
 }
 
@@ -229,7 +238,9 @@ export function documentSnapshotsEqual(a: DocumentSnapshot, b: DocumentSnapshot)
       left.clipped !== right.clipped ||
       left.text !== right.text ||
       left.shape !== right.shape ||
-      left.adjustment !== right.adjustment
+      left.adjustment !== right.adjustment ||
+      left.parentId !== right.parentId ||
+      left.collapsed !== right.collapsed
     ) {
       return false;
     }

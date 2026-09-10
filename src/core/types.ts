@@ -51,7 +51,7 @@ import type { ShapeData } from './shape-layer';
 import type { TextLayerData } from './text-layer';
 
 /** Raster is the only kind step 1 creates; the others are produced by later steps. */
-export type LayerType = 'raster' | 'text' | 'shape' | 'adjustment';
+export type LayerType = 'raster' | 'text' | 'shape' | 'adjustment' | 'group';
 
 export interface Rect {
   x: number;
@@ -102,4 +102,8 @@ export interface Layer {
    * everything composited beneath them.
    */
   adjustment?: AdjustmentData;
+  /** The group this layer sits inside, if any. Groups can nest. */
+  parentId?: string;
+  /** Collapsed groups hide their children in the panel, not in the composite. */
+  collapsed?: boolean;
 }
