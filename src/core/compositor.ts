@@ -1,5 +1,8 @@
+import { WebGLCompositor } from '../view/webgl-compositor';
 import { createAdjustment } from './adjustments';
 import type { PixelDocument } from './document';
+import { TileGrid } from './tiles';
+import type { Rect } from './types';
 import type { Layer } from './types';
 import { blendModeToComposite } from './types';
 
@@ -214,8 +217,29 @@ export class Compositor {
   private live: LiveStroke | null = null;
   /** When set, the view shows only this layer's mask, as greyscale. */
   private maskPreviewLayerId: string | null = null;
+  private readonly tiles = new TileGrid();
+  /** How long the last recomposite took, for the debug overlay. */
+  lastComposeMs = 0;
+  lastDirtyTiles = 0;
   /** Scratch used for clipping groups and non-plain layers. */
   private scratch: HTMLCanvasElement | null = null;
+
+  /**
+   * The WebGL2 path. It is built lazily and may stay null: a machine without
+   * WebGL2, or a driver that will not link the shaders, simply keeps using
+   * Canvas 2D rather than showing a black canvas.
+   */
+  private gl: WebGLCompositor | null = null;
+  private glTried = false;
+  private glWanted = true;
+  /** Which path produced the last composite. */
+  activePath: '2d' | 'webgl' = '2d';
+  /**
+   * Bumped whenever a layer's own pixels may have changed, so the GL path
+   * knows when to re-upload. A brush dab does NOT bump it: the wet paint is
+   * in the live stroke buffer, not in the layer bitmap.
+   */
+  private layerRevision = 0;
 
   constructor(doc: PixelDocument) {
     this.doc = doc;
@@ -234,11 +258,60 @@ export class Compositor {
 
   markDirty(): void {
     this.dirty = true;
+    this.layerRevision += 1;
+    this.tiles.markAll();
+  }
+
+  /**
+   * Marks only the tiles a change touched. A brush dab uses this, which is
+   * what keeps a stroke on a large document cheap.
+   */
+  markDirtyRect(rect: Rect): void {
+    this.dirty = true;
+    this.tiles.resize(this.canvas.width, this.canvas.height);
+    this.tiles.markRect(rect);
+  }
+
+  get tileStats(): { dirty: number; total: number } {
+    return { dirty: this.tiles.dirtyCount, total: this.tiles.tileCount };
+  }
+
+  /** The canvas holding the finished composite, whichever path drew it. */
+  get outputCanvas(): HTMLCanvasElement {
+    return this.activePath === 'webgl' && this.gl ? this.gl.canvas : this.canvas;
+  }
+
+  /** The settings toggle. Turning it off returns everything to Canvas 2D. */
+  get webglEnabled(): boolean {
+    return this.glWanted;
+  }
+
+  set webglEnabled(value: boolean) {
+    if (this.glWanted === value) return;
+    this.glWanted = value;
+    this.markDirty();
+  }
+
+  /** False when this machine cannot run the GL path at all. */
+  get webglAvailable(): boolean {
+    return this.ensureGl() !== null;
+  }
+
+  get textureBytes(): number {
+    return this.gl?.textureBytes ?? 0;
+  }
+
+  private ensureGl(): WebGLCompositor | null {
+    if (!this.glTried) {
+      this.glTried = true;
+      this.gl = WebGLCompositor.create();
+    }
+    return this.gl;
   }
 
   setLiveStroke(stroke: LiveStroke | null): void {
     this.live = stroke;
-    this.dirty = true;
+    this.markDirty();
   }
 
   /** Alt+clicking a mask thumbnail shows the mask by itself. */
@@ -256,7 +329,8 @@ export class Compositor {
       this.canvas.width = this.doc.width;
       this.canvas.height = this.doc.height;
     }
-    this.dirty = true;
+    this.tiles.resize(this.canvas.width, this.canvas.height);
+    this.markDirty();
   }
 
   composeIfDirty(): boolean {
@@ -267,11 +341,41 @@ export class Compositor {
 
   private compose(): void {
     const { ctx, doc } = this;
+    const started = performance.now();
+
+    if (this.glWanted) {
+      const gl = this.ensureGl();
+      if (gl && gl.canHandle(doc, this.maskPreviewLayerId)
+        && gl.compose(doc, this.live, this.layerRevision)) {
+        this.activePath = 'webgl';
+        this.dirty = false;
+        this.lastDirtyTiles = this.tiles.dirtyCount;
+        this.tiles.clean();
+        this.lastComposeMs = performance.now() - started;
+        return;
+      }
+    }
+    this.activePath = '2d';
+
+    this.tiles.resize(this.canvas.width, this.canvas.height);
+    const region = this.tiles.dirtyRegion(this.canvas.width, this.canvas.height)
+      ?? { x: 0, y: 0, width: this.canvas.width, height: this.canvas.height };
+    this.lastDirtyTiles = this.tiles.dirtyCount;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Everything below is confined to the dirty region, so an ordinary brush
+    // stroke repaints a couple of tiles rather than the whole document.
+    const partial = region.width < this.canvas.width || region.height < this.canvas.height;
+    if (partial) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(region.x, region.y, region.width, region.height);
+      ctx.clip();
+    }
+    ctx.clearRect(region.x, region.y, region.width, region.height);
 
     if (this.maskPreviewLayerId) {
       const previewed = doc.getLayer(this.maskPreviewLayerId);
@@ -279,16 +383,23 @@ export class Compositor {
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.drawImage(previewed.mask, previewed.x, previewed.y);
+        if (partial) ctx.restore();
         this.dirty = false;
+        this.tiles.clean();
+        this.lastComposeMs = performance.now() - started;
         return;
       }
     }
 
     this.renderSiblings(ctx, this.canvas.width, this.canvas.height, childrenOf(doc.layers, undefined));
 
+    if (partial) ctx.restore();
+
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     this.dirty = false;
+    this.tiles.clean();
+    this.lastComposeMs = performance.now() - started;
   }
 
   /** Draws one level of the layer tree, bottom first. */

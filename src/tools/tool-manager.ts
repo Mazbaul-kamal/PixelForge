@@ -15,7 +15,7 @@ export interface ToolManagerDeps {
   viewport: Viewport;
   colours: ColourState;
   requestRender: () => void;
-  invalidateComposite: () => void;
+  invalidateComposite: (region?: import('../core/types').Rect) => void;
   setLiveStroke: (stroke: LiveStroke | null) => void;
   readSourcePixels: (allLayers: boolean) => ImageData | null;
   drawingTarget: () => 'layer' | 'mask';

@@ -3,7 +3,7 @@ import type { PixelDocument } from '../core/document';
 import type { History } from '../core/history';
 import type { LiveStroke } from '../core/compositor';
 import type { SelectionMask } from '../core/selection';
-import type { Layer, Point } from '../core/types';
+import type { Layer, Point, Rect } from '../core/types';
 import type { Viewport } from '../core/viewport';
 
 /** A declarative option. The options bar renders itself from these. */
@@ -99,8 +99,11 @@ export interface ToolContext {
   readonly drawingTarget: 'layer' | 'mask';
   /** Ask for a repaint of the view. */
   requestRender(): void;
-  /** Report that layer pixels or layer properties changed. */
-  invalidateComposite(): void;
+  /**
+   * Report that layer pixels or properties changed. Passing the affected
+   * document rectangle lets the compositor repaint only those tiles.
+   */
+  invalidateComposite(region?: Rect): void;
   /**
    * Shows an in-progress stroke composited in the right place in the layer
    * stack. Passing null clears it. Used by every tool that paints into a

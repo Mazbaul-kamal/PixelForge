@@ -1,4 +1,4 @@
-import type { Point } from './types';
+import type { Point, Rect } from './types';
 
 export interface BrushSettings {
   /** Diameter in document pixels. */
@@ -61,6 +61,11 @@ export class StrokeEngine {
   /** Distance still to travel before the next dab. */
   private toNextDab = 0;
   private painted = false;
+  /** Area touched since it was last collected, so only those tiles repaint. */
+  private dirtyLeft = Infinity;
+  private dirtyTop = Infinity;
+  private dirtyRight = -Infinity;
+  private dirtyBottom = -Infinity;
 
   /**
    * When set, the engine reports dabs instead of stamping them.
@@ -82,6 +87,31 @@ export class StrokeEngine {
 
   get hasPainted(): boolean {
     return this.painted;
+  }
+
+  /** The region dabs have covered since the last call, then resets it. */
+  takeDirtyBounds(): Rect | null {
+    if (this.dirtyRight < this.dirtyLeft) return null;
+
+    const rect: Rect = {
+      x: Math.floor(this.dirtyLeft),
+      y: Math.floor(this.dirtyTop),
+      width: Math.ceil(this.dirtyRight - this.dirtyLeft) + 2,
+      height: Math.ceil(this.dirtyBottom - this.dirtyTop) + 2,
+    };
+    this.dirtyLeft = Infinity;
+    this.dirtyTop = Infinity;
+    this.dirtyRight = -Infinity;
+    this.dirtyBottom = -Infinity;
+    return rect;
+  }
+
+  private noteDab(x: number, y: number, radius: number): void {
+    const reach = radius + 1;
+    if (x - reach < this.dirtyLeft) this.dirtyLeft = x - reach;
+    if (y - reach < this.dirtyTop) this.dirtyTop = y - reach;
+    if (x + reach > this.dirtyRight) this.dirtyRight = x + reach;
+    if (y + reach > this.dirtyBottom) this.dirtyBottom = y + reach;
   }
 
   begin(sample: StrokeSample): void {
@@ -174,6 +204,8 @@ export class StrokeEngine {
     const alpha =
       this.settings.flow * (this.settings.pressureOpacity ? sample.pressure : 1);
     if (alpha <= 0) return;
+
+    this.noteDab(sample.x, sample.y, radius);
 
     if (this.onDab) {
       this.onDab({ x: sample.x, y: sample.y, radius, alpha: Math.min(alpha, 1) });

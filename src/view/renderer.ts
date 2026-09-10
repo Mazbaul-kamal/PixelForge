@@ -25,6 +25,14 @@ export class ViewRenderer {
   private frame = 0;
   private overlay: ((ctx: CanvasRenderingContext2D) => void) | null = null;
 
+  private lastTickAt = 0;
+  /**
+   * Smoothed time between frames that actually drew, and the cost of the draw
+   * itself. Only frames that redraw count: an idle loop is not a fast one.
+   */
+  frameMs = 0;
+  drawMs = 0;
+
   private checkerA = '#cfcfcf';
   private checkerB = '#f2f2f2';
   private docBorder = 'rgba(0, 0, 0, 0.55)';
@@ -111,9 +119,20 @@ export class ViewRenderer {
   private tick(): void {
     if (Math.min(window.devicePixelRatio || 1, MAX_DPR) !== this.dpr) this.syncSize();
     if (this.compositor.composeIfDirty()) this.needsRedraw = true;
-    if (!this.needsRedraw) return;
+    if (!this.needsRedraw) {
+      this.lastTickAt = 0;
+      return;
+    }
+
+    const now = performance.now();
+    if (this.lastTickAt > 0) {
+      const elapsed = now - this.lastTickAt;
+      this.frameMs = this.frameMs > 0 ? this.frameMs * 0.8 + elapsed * 0.2 : elapsed;
+    }
+    this.lastTickAt = now;
 
     this.draw();
+    this.drawMs = performance.now() - now;
     this.needsRedraw = false;
   }
 
@@ -151,7 +170,7 @@ export class ViewRenderer {
     ctx.imageSmoothingEnabled = viewport.zoom <= 1;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(
-      this.compositor.canvas,
+      this.compositor.outputCanvas,
       0,
       0,
       doc.width,

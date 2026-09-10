@@ -80,7 +80,14 @@ export function createBrushTool(): Tool {
       }
 
       showLive(context, active);
-      context.invalidateComposite();
+      // Only the tiles the new dabs covered need recompositing.
+      const touched = active.engine.takeDirtyBounds();
+      context.invalidateComposite(touched ? {
+        x: touched.x + active.surface.layer.x,
+        y: touched.y + active.surface.layer.y,
+        width: touched.width,
+        height: touched.height,
+      } : undefined);
     },
 
     onPointerUp(context: ToolContext): void {

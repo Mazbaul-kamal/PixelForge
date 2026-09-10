@@ -5,6 +5,7 @@ import './styles/layers.css';
 import './styles/chrome.css';
 import './styles/dialog.css';
 import './styles/tools.css';
+import './styles/debug.css';
 
 import { ColourState } from './core/colour-state';
 import { Compositor } from './core/compositor';
@@ -73,6 +74,7 @@ import { NoticeStack } from './ui/notice';
 import { OptionsBar } from './ui/options-bar';
 import { ToolRail } from './ui/tool-rail';
 import { attachSelectionShortcuts } from './ui/selection-shortcuts';
+import { attachDebugOverlay } from './ui/debug-overlay';
 import { attachViewShortcuts } from './ui/view-shortcuts';
 import { UnsavedGuard } from './ui/unsaved-guard';
 import { attachLayerShortcuts } from './ui/layer-shortcuts';
@@ -222,6 +224,7 @@ function boot(): void {
   });
   attachViewShortcuts(viewport, doc);
 
+
   // ---- tools ----
   const colours = new ColourState();
 
@@ -251,7 +254,12 @@ function boot(): void {
     viewport,
     colours,
     requestRender: renderer.invalidate,
-    invalidateComposite: documentChanged,
+    invalidateComposite: (region) => {
+      // A region means only those tiles need recompositing.
+      if (region) compositor.markDirtyRect(region);
+      else compositor.markDirty();
+      renderer.invalidate();
+    },
     setLiveStroke: (stroke) => {
       compositor.setLiveStroke(stroke);
       renderer.invalidate();
@@ -453,7 +461,7 @@ function boot(): void {
       return;
     }
     compositor.composeIfDirty();
-    const defined = patternFromSelection(doc, selection, compositor.canvas);
+    const defined = patternFromSelection(doc, selection, compositor.outputCanvas);
     if (!defined) return;
 
     // One custom pattern at a time, kept under a stable id the option refers to.
@@ -497,6 +505,7 @@ function boot(): void {
   }
 
   const filterRunner = new FilterRunner();
+  attachDebugOverlay(shell.stage, doc, compositor, renderer, filterRunner);
   const adjustmentDeps = {
     doc, history, compositor,
     onChanged: () => { thumbnails.markAllDirty(); documentChanged(); },
@@ -520,7 +529,7 @@ function boot(): void {
   const projectStore = new ProjectStore();
   const projects = new ProjectCommands({
     doc, history, viewport, store: projectStore,
-    composite: () => { compositor.composeIfDirty(); return compositor.canvas; },
+    composite: () => { compositor.composeIfDirty(); return compositor.outputCanvas; },
     onRestored: () => {
       thumbnails.markAllDirty();
       compositor.syncSize();
@@ -538,7 +547,7 @@ function boot(): void {
       doc, store: projectStore,
       projectId: () => projects.projectId,
       viewport: () => ({ zoom: viewport.zoom, panX: viewport.panX, panY: viewport.panY }),
-      composite: () => { compositor.composeIfDirty(); return compositor.canvas; },
+      composite: () => { compositor.composeIfDirty(); return compositor.outputCanvas; },
       onError: (message) => notices.error('Automatic save failed.', message),
     }),
   );
@@ -581,7 +590,7 @@ function boot(): void {
                 compositor.composeIfDirty();
                 const { writePsd } = await import('ag-psd');
                 const data = writePsd(
-                  buildPsd(doc, compositor.canvas) as never,
+                  buildPsd(doc, compositor.outputCanvas) as never,
                   { generateThumbnail: true },
                 );
                 const blob = new Blob([data], { type: 'image/vnd.adobe.photoshop' });
