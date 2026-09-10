@@ -9,14 +9,106 @@ import { blendModeToComposite } from './types';
  */
 export interface LiveStroke {
   readonly layerId: string;
-  /** Buffer in the target layer's coordinate space, painted at full alpha. */
+  /** Buffer in the target surface's coordinate space, painted at full alpha. */
   readonly canvas: HTMLCanvasElement;
   readonly opacity: number;
   /**
-   * How the buffer joins the layer. Not a BlendMode: the eraser needs
+   * How the buffer joins the surface. Not a BlendMode: the eraser needs
    * 'destination-out', which is a compositing operation rather than a blend.
    */
   readonly composite: GlobalCompositeOperation;
+  /** Which surface of the layer is being painted. Defaults to the pixels. */
+  readonly target?: 'layer' | 'mask';
+}
+
+function isDrawable(layer: Layer): boolean {
+  return (
+    layer.visible &&
+    layer.opacity > 0 &&
+    layer.canvas.width > 0 &&
+    layer.canvas.height > 0
+  );
+}
+
+export function hasActiveMask(layer: Layer): boolean {
+  return layer.mask !== undefined && layer.maskEnabled !== false;
+}
+
+const LUMA_FILTER_ID = 'pf-luma-to-alpha';
+let lumaFilterReady = false;
+
+/**
+ * A mask is greyscale — white reveals, black hides — but destination-in reads
+ * the ALPHA channel, and opaque black has full alpha. So the mask's luminance
+ * has to become its alpha before it can be used to cut anything out.
+ */
+function ensureLumaFilter(): void {
+  if (lumaFilterReady || document.getElementById(LUMA_FILTER_ID)) {
+    lumaFilterReady = true;
+    return;
+  }
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '0');
+  svg.setAttribute('height', '0');
+  svg.style.position = 'absolute';
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML =
+    `<filter id="${LUMA_FILTER_ID}" color-interpolation-filters="sRGB">` +
+    '<feColorMatrix type="matrix" values="' +
+    '0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.2126 0.7152 0.0722 0 0"/></filter>';
+  document.body.appendChild(svg);
+  lumaFilterReady = true;
+}
+
+/** The mask converted so that its brightness becomes coverage. */
+export function maskAsAlpha(mask: HTMLCanvasElement): HTMLCanvasElement {
+  ensureLumaFilter();
+
+  const converted = document.createElement('canvas');
+  converted.width = mask.width;
+  converted.height = mask.height;
+
+  const ctx = converted.getContext('2d', { willReadFrequently: false });
+  if (!ctx) return mask;
+
+  ctx.filter = `url(#${LUMA_FILTER_ID})`;
+  ctx.drawImage(mask, 0, 0);
+  ctx.filter = 'none';
+
+  // Some engines silently ignore an SVG filter reference; fall back to doing
+  // the same conversion by hand rather than showing an unmasked layer.
+  const probe = ctx.getImageData(0, 0, 1, 1).data;
+  const source = mask.getContext('2d')?.getImageData(0, 0, 1, 1).data;
+  if (source) {
+    const expected = Math.round(
+      (0.2126 * source[0]! + 0.7152 * source[1]! + 0.0722 * source[2]!) * (source[3]! / 255),
+    );
+    if (Math.abs(probe[3]! - expected) > 4) return maskAsAlphaManually(mask);
+  }
+  return converted;
+}
+
+function maskAsAlphaManually(mask: HTMLCanvasElement): HTMLCanvasElement {
+  const converted = document.createElement('canvas');
+  converted.width = mask.width;
+  converted.height = mask.height;
+
+  const ctx = converted.getContext('2d');
+  const sourceCtx = mask.getContext('2d', { willReadFrequently: true });
+  if (!ctx || !sourceCtx) return mask;
+
+  const image = sourceCtx.getImageData(0, 0, mask.width, mask.height);
+  const data = image.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const luma = 0.2126 * data[i]! + 0.7152 * data[i + 1]! + 0.0722 * data[i + 2]!;
+    data[i] = 255;
+    data[i + 1] = 255;
+    data[i + 2] = 255;
+    data[i + 3] = luma * (data[i + 3]! / 255);
+  }
+  ctx.putImageData(image, 0, 0);
+  return converted;
 }
 
 /**
@@ -37,20 +129,64 @@ export function drawLayers(
     if (!isDrawable(layer)) continue;
     ctx.globalAlpha = Math.min(Math.max(layer.opacity, 0), 1);
     ctx.globalCompositeOperation = blendModeToComposite(layer.blendMode);
-    ctx.drawImage(layer.canvas, layer.x - offsetX, layer.y - offsetY);
+    ctx.drawImage(surfaceFor(layer), layer.x - offsetX, layer.y - offsetY);
   }
 
   ctx.globalAlpha = previousAlpha;
   ctx.globalCompositeOperation = previousComposite;
 }
 
-function isDrawable(layer: Layer): boolean {
-  return (
-    layer.visible &&
-    layer.opacity > 0 &&
-    layer.canvas.width > 0 &&
-    layer.canvas.height > 0
-  );
+/**
+ * The layer's visible bitmap: its pixels with the mask applied.
+ *
+ * Canvas cannot clip to an arbitrary alpha mask, so the layer is drawn into a
+ * scratch and the mask composited over it with destination-in.
+ */
+export function surfaceFor(layer: Layer, extra?: LiveStroke): HTMLCanvasElement {
+  const stroke = extra && extra.layerId === layer.id ? extra : undefined;
+  const maskStroke = stroke?.target === 'mask' ? stroke : undefined;
+  const pixelStroke = stroke && stroke.target !== 'mask' ? stroke : undefined;
+
+  if (!hasActiveMask(layer) && !pixelStroke && !maskStroke) return layer.canvas;
+
+  const scratch = document.createElement('canvas');
+  scratch.width = layer.canvas.width;
+  scratch.height = layer.canvas.height;
+
+  const ctx = scratch.getContext('2d');
+  if (!ctx) return layer.canvas;
+
+  ctx.drawImage(layer.canvas, 0, 0);
+  if (pixelStroke) {
+    ctx.globalAlpha = Math.min(Math.max(pixelStroke.opacity, 0), 1);
+    ctx.globalCompositeOperation = pixelStroke.composite;
+    ctx.drawImage(pixelStroke.canvas, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  if (!hasActiveMask(layer) || !layer.mask) return scratch;
+
+  let mask: HTMLCanvasElement = layer.mask;
+  if (maskStroke) {
+    // Painting on the mask has to show through the composite as it happens.
+    const edited = document.createElement('canvas');
+    edited.width = mask.width;
+    edited.height = mask.height;
+    const editedCtx = edited.getContext('2d');
+    if (editedCtx) {
+      editedCtx.drawImage(mask, 0, 0);
+      editedCtx.globalAlpha = Math.min(Math.max(maskStroke.opacity, 0), 1);
+      editedCtx.globalCompositeOperation = maskStroke.composite;
+      editedCtx.drawImage(maskStroke.canvas, 0, 0);
+      mask = edited;
+    }
+  }
+
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.drawImage(maskAsAlpha(mask), 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  return scratch;
 }
 
 /**
@@ -64,7 +200,9 @@ export class Compositor {
   private readonly doc: PixelDocument;
   private dirty = true;
   private live: LiveStroke | null = null;
-  /** Scratch used only when a stroke lands on a layer that is not plain. */
+  /** When set, the view shows only this layer's mask, as greyscale. */
+  private maskPreviewLayerId: string | null = null;
+  /** Scratch used for clipping groups and non-plain layers. */
   private scratch: HTMLCanvasElement | null = null;
 
   constructor(doc: PixelDocument) {
@@ -82,18 +220,25 @@ export class Compositor {
     return this.dirty;
   }
 
-  /** Called by anything that changes pixels, layer order or layer properties. */
   markDirty(): void {
     this.dirty = true;
   }
 
-  /** Shows or clears the stroke currently being painted. */
   setLiveStroke(stroke: LiveStroke | null): void {
     this.live = stroke;
     this.dirty = true;
   }
 
-  /** Resizes the composite to match the document. Always leaves it dirty. */
+  /** Alt+clicking a mask thumbnail shows the mask by itself. */
+  setMaskPreview(layerId: string | null): void {
+    this.maskPreviewLayerId = layerId;
+    this.dirty = true;
+  }
+
+  get maskPreview(): string | null {
+    return this.maskPreviewLayerId;
+  }
+
   syncSize(): void {
     if (this.canvas.width !== this.doc.width || this.canvas.height !== this.doc.height) {
       this.canvas.width = this.doc.width;
@@ -102,7 +247,6 @@ export class Compositor {
     this.dirty = true;
   }
 
-  /** Redraws only when dirty. Returns true if the composite actually changed. */
   composeIfDirty(): boolean {
     if (!this.dirty) return false;
     this.compose();
@@ -117,14 +261,39 @@ export class Compositor {
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    if (!this.live) {
-      drawLayers(ctx, doc.layers);
-    } else {
-      for (const layer of doc.layers) {
-        if (!isDrawable(layer)) continue;
-        if (layer.id === this.live.layerId) this.drawLayerWithStroke(layer, this.live);
-        else drawLayers(ctx, [layer]);
+    if (this.maskPreviewLayerId) {
+      const previewed = doc.getLayer(this.maskPreviewLayerId);
+      if (previewed?.mask) {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.drawImage(previewed.mask, previewed.x, previewed.y);
+        this.dirty = false;
+        return;
       }
+    }
+
+    const layers = doc.layers;
+    let index = 0;
+
+    while (index < layers.length) {
+      const base = layers[index]!;
+      if (!isDrawable(base)) {
+        index++;
+        continue;
+      }
+
+      // Gather the run of layers clipped to this one.
+      const clipped: Layer[] = [];
+      let next = index + 1;
+      while (next < layers.length && layers[next]!.clipped === true) {
+        if (isDrawable(layers[next]!)) clipped.push(layers[next]!);
+        next++;
+      }
+
+      if (clipped.length === 0) this.drawSingle(base);
+      else this.drawClippingGroup(base, clipped);
+
+      index = next;
     }
 
     ctx.globalAlpha = 1;
@@ -132,52 +301,59 @@ export class Compositor {
     this.dirty = false;
   }
 
-  /**
-   * Paint has to join the layer's pixels BEFORE the layer's own opacity and
-   * blend mode apply, otherwise a stroke on a 50% layer previews at the wrong
-   * strength. A plain layer can take the fast path; anything else is combined
-   * in a scratch canvas first.
-   */
-  private drawLayerWithStroke(layer: Layer, live: LiveStroke): void {
+  private drawSingle(layer: Layer): void {
     const { ctx } = this;
-    // The fast path is only safe when the stroke lands on the layer exactly as
-    // it would on the composite. Any other compositing operation has to happen
-    // against the layer's own pixels, not against the layers underneath it.
-    const plain =
-      layer.opacity >= 1 &&
-      layer.blendMode === 'normal' &&
-      live.composite === 'source-over';
-
-    if (plain) {
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(layer.canvas, layer.x, layer.y);
-      ctx.globalAlpha = Math.min(Math.max(live.opacity, 0), 1);
-      ctx.globalCompositeOperation = live.composite;
-      ctx.drawImage(live.canvas, layer.x, layer.y);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-      return;
-    }
-
-    const scratch = this.ensureScratch(layer.canvas.width, layer.canvas.height);
-    const scratchCtx = scratch.getContext('2d');
-    if (!scratchCtx) return;
-
-    scratchCtx.setTransform(1, 0, 0, 1, 0, 0);
-    scratchCtx.globalAlpha = 1;
-    scratchCtx.globalCompositeOperation = 'source-over';
-    scratchCtx.clearRect(0, 0, scratch.width, scratch.height);
-    scratchCtx.drawImage(layer.canvas, 0, 0);
-    scratchCtx.globalAlpha = Math.min(Math.max(live.opacity, 0), 1);
-    scratchCtx.globalCompositeOperation = live.composite;
-    scratchCtx.drawImage(live.canvas, 0, 0);
-    scratchCtx.globalAlpha = 1;
-    scratchCtx.globalCompositeOperation = 'source-over';
-
     ctx.globalAlpha = Math.min(Math.max(layer.opacity, 0), 1);
     ctx.globalCompositeOperation = blendModeToComposite(layer.blendMode);
-    ctx.drawImage(scratch, layer.x, layer.y);
+    ctx.drawImage(surfaceFor(layer, this.live ?? undefined), layer.x, layer.y);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /**
+   * A base layer and everything clipped to it. Each clipped layer is trimmed
+   * to the base's alpha, then the whole group composites with the base's own
+   * opacity and blend mode.
+   */
+  private drawClippingGroup(base: Layer, clipped: readonly Layer[]): void {
+    const { ctx } = this;
+    const baseSurface = surfaceFor(base, this.live ?? undefined);
+
+    const group = this.ensureScratch(this.canvas.width, this.canvas.height);
+    const groupCtx = group.getContext('2d');
+    if (!groupCtx) return;
+
+    groupCtx.setTransform(1, 0, 0, 1, 0, 0);
+    groupCtx.globalAlpha = 1;
+    groupCtx.globalCompositeOperation = 'source-over';
+    groupCtx.clearRect(0, 0, group.width, group.height);
+    groupCtx.drawImage(baseSurface, base.x, base.y);
+
+    for (const layer of clipped) {
+      const trimmed = document.createElement('canvas');
+      trimmed.width = group.width;
+      trimmed.height = group.height;
+      const trimmedCtx = trimmed.getContext('2d');
+      if (!trimmedCtx) continue;
+
+      trimmedCtx.drawImage(surfaceFor(layer, this.live ?? undefined), layer.x, layer.y);
+      // Trimmed to the BASE's alpha, not to whatever the group has become, so
+      // three clipped layers all clip to the same shape.
+      trimmedCtx.globalCompositeOperation = 'destination-in';
+      trimmedCtx.drawImage(baseSurface, base.x, base.y);
+
+      groupCtx.globalAlpha = Math.min(Math.max(layer.opacity, 0), 1);
+      groupCtx.globalCompositeOperation = blendModeToComposite(layer.blendMode);
+      groupCtx.drawImage(trimmed, 0, 0);
+      groupCtx.globalAlpha = 1;
+      groupCtx.globalCompositeOperation = 'source-over';
+    }
+
+    ctx.globalAlpha = Math.min(Math.max(base.opacity, 0), 1);
+    ctx.globalCompositeOperation = blendModeToComposite(base.blendMode);
+    ctx.drawImage(group, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   private ensureScratch(width: number, height: number): HTMLCanvasElement {

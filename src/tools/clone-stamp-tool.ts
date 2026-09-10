@@ -1,11 +1,12 @@
 import { createLayer } from '../core/layer';
 import { captureLayerPixels, restoreLayerPixels } from '../core/snapshot';
 import { StrokeEngine } from '../core/stroke-engine';
-import type { Layer, Point } from '../core/types';
+import type { Point } from '../core/types';
 import {
-  drawCursorOutline, paintableLayer, readBrushSettings, stepBrushSize, strokeOptions,
+  drawCursorOutline, paintableSurface, readBrushSettings, stepBrushSize, strokeOptions,
   toBufferSample,
 } from './stroke-tool';
+import type { PaintSurface } from './stroke-tool';
 import type { Tool, ToolContext, ToolPointer } from './types';
 
 export interface CloneDeps {
@@ -29,7 +30,7 @@ export function createCloneStampTool(deps: CloneDeps): Tool {
   let alphaBuffer: HTMLCanvasElement | null = null;
   let cloneBuffer: HTMLCanvasElement | null = null;
   let sourceImage: HTMLCanvasElement | null = null;
-  let target: Layer | null = null;
+  let target: PaintSurface | null = null;
 
   /** Snapshot of what we are cloning FROM, taken before the stroke starts. */
   const captureSource = (context: ToolContext): HTMLCanvasElement | null => {
@@ -54,21 +55,22 @@ export function createCloneStampTool(deps: CloneDeps): Tool {
     ctx.clearRect(0, 0, cloneBuffer.width, cloneBuffer.height);
     // A point p must copy from p + offset, and drawImage placed at d makes
     // p read source(p - d), so the image goes down at -offset.
-    ctx.drawImage(sourceImage, -(target.x + offset.x), -(target.y + offset.y));
+    ctx.drawImage(sourceImage, -(target.layer.x + offset.x), -(target.layer.y + offset.y));
     ctx.globalCompositeOperation = 'destination-in';
     ctx.drawImage(alphaBuffer, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
 
     context.setLiveStroke({
-      layerId: target.id,
+      layerId: target.layer.id,
       canvas: cloneBuffer,
       opacity: context.options.get<number>('opacity') / 100,
       composite: 'source-over',
+      target: target.isMask ? 'mask' : 'layer',
     });
   };
 
   const endStroke = (context: ToolContext): void => {
-    const layer = target;
+    const surface = target;
     const buffer = cloneBuffer;
     const painted = engine?.hasPainted ?? false;
 
@@ -79,19 +81,20 @@ export function createCloneStampTool(deps: CloneDeps): Tool {
     target = null;
     context.setLiveStroke(null);
 
-    if (!layer || !buffer || !painted) {
+    if (!surface || !buffer || !painted) {
       context.invalidateComposite();
       return;
     }
 
     const doc = context.doc;
-    const before = captureLayerPixels(layer);
-    layer.ctx.save();
-    layer.ctx.globalAlpha = Math.min(1, Math.max(0, context.options.get<number>('opacity') / 100));
-    layer.ctx.drawImage(buffer, 0, 0);
-    layer.ctx.restore();
+    const kind = surface.isMask ? 'mask' : 'layer';
+    const before = captureLayerPixels(surface.layer, kind);
+    surface.ctx.save();
+    surface.ctx.globalAlpha = Math.min(1, Math.max(0, context.options.get<number>('opacity') / 100));
+    surface.ctx.drawImage(buffer, 0, 0);
+    surface.ctx.restore();
 
-    const after = captureLayerPixels(layer);
+    const after = captureLayerPixels(surface.layer, kind);
     context.history.push(
       'Clone Stamp',
       () => restoreLayerPixels(doc, before),
@@ -138,34 +141,35 @@ export function createCloneStampTool(deps: CloneDeps): Tool {
         offset = { x: sourcePoint.x - pointer.doc.x, y: sourcePoint.y - pointer.doc.y };
       }
 
-      let layer = paintableLayer(context);
-      if (!layer) return;
+      let surface = paintableSurface(context);
+      if (!surface) return;
 
       if (context.options.get<boolean>('cloneToNewLayer')) {
         const fresh = createLayer({
           name: 'Clone', width: context.doc.width, height: context.doc.height,
         });
+        const base = surface.layer;
         context.history.transaction('Clone Layer', () => {
-          context.doc.addLayer(fresh, context.doc.indexOfLayer(layer!.id) + 1);
+          context.doc.addLayer(fresh, context.doc.indexOfLayer(base.id) + 1);
           context.doc.setActiveLayer(fresh.id);
         });
-        layer = fresh;
+        surface = { layer: fresh, canvas: fresh.canvas, ctx: fresh.ctx, isMask: false };
         deps.onChanged();
       }
 
-      target = layer;
+      target = surface;
       alphaBuffer = document.createElement('canvas');
-      alphaBuffer.width = layer.canvas.width;
-      alphaBuffer.height = layer.canvas.height;
+      alphaBuffer.width = surface.canvas.width;
+      alphaBuffer.height = surface.canvas.height;
       cloneBuffer = document.createElement('canvas');
-      cloneBuffer.width = layer.canvas.width;
-      cloneBuffer.height = layer.canvas.height;
+      cloneBuffer.width = surface.canvas.width;
+      cloneBuffer.height = surface.canvas.height;
 
       const ctx = alphaBuffer.getContext('2d');
       if (!ctx) return;
 
       engine = new StrokeEngine(ctx, readBrushSettings(context, '#ffffff'));
-      engine.begin(toBufferSample(pointer, layer));
+      engine.begin(toBufferSample(pointer, surface));
       refreshCloneBuffer(context);
       context.invalidateComposite();
     },

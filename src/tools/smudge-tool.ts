@@ -3,11 +3,12 @@ import { hexToRgb } from '../core/colour-utils';
 import { captureLayerPixels, restoreLayerPixels } from '../core/snapshot';
 import { StrokeEngine } from '../core/stroke-engine';
 import type { PixelSnapshot } from '../core/snapshot';
-import type { Layer, Point } from '../core/types';
+import type { Point } from '../core/types';
 import {
-  drawCursorOutline, paintableLayer, readBrushSettings, stepBrushSize, strokeOptions,
+  drawCursorOutline, paintableSurface, readBrushSettings, stepBrushSize, strokeOptions,
   toBufferSample,
 } from './stroke-tool';
+import type { PaintSurface } from './stroke-tool';
 import type { Tool, ToolContext, ToolPointer } from './types';
 
 export interface SmudgeDeps {
@@ -24,7 +25,7 @@ export interface SmudgeDeps {
  */
 export function createSmudgeTool(deps: SmudgeDeps): Tool {
   let engine: StrokeEngine | null = null;
-  let target: Layer | null = null;
+  let target: PaintSurface | null = null;
   let before: PixelSnapshot | null = null;
   let hover: Point | null = null;
 
@@ -48,7 +49,7 @@ export function createSmudgeTool(deps: SmudgeDeps): Tool {
   };
 
   const finish = (context: ToolContext): void => {
-    const layer = target;
+    const surface = target;
     const start = before;
     const painted = engine?.hasPainted ?? false;
     engine = null;
@@ -57,10 +58,10 @@ export function createSmudgeTool(deps: SmudgeDeps): Tool {
     buffer = null;
     bufferSize = 0;
 
-    if (!layer || !start || !painted) return;
+    if (!surface || !start || !painted) return;
 
     const doc = context.doc;
-    const after = captureLayerPixels(layer);
+    const after = captureLayerPixels(surface.layer, surface.isMask ? 'mask' : 'layer');
     context.history.push(
       'Smudge',
       () => restoreLayerPixels(doc, start),
@@ -83,11 +84,12 @@ export function createSmudgeTool(deps: SmudgeDeps): Tool {
     ],
 
     onPointerDown(context: ToolContext, pointer: ToolPointer): void {
-      const layer = paintableLayer(context);
-      if (!layer) return;
+      const surface = paintableSurface(context);
+      if (!surface) return;
 
-      target = layer;
-      before = captureLayerPixels(layer);
+      target = surface;
+      const layer = surface.layer;
+      before = captureLayerPixels(layer, surface.isMask ? 'mask' : 'layer');
       buffer = null;
       bufferSize = 0;
 
@@ -102,11 +104,11 @@ export function createSmudgeTool(deps: SmudgeDeps): Tool {
       const seed: [number, number, number] | null =
         seedColour ? [seedColour.r, seedColour.g, seedColour.b] : null;
 
-      engine = new StrokeEngine(layer.ctx, readBrushSettings(context, '#000000'));
+      engine = new StrokeEngine(surface.ctx, readBrushSettings(context, '#000000'));
       engine.onDab = (dab) => {
         if (strength <= 0) return;
 
-        const patch = dabBox(layer, dab);
+        const patch = dabBox(surface, dab);
         if (!patch) return;
 
         const size = Math.max(1, Math.ceil(dab.radius) * 2 + 3);
@@ -155,10 +157,10 @@ export function createSmudgeTool(deps: SmudgeDeps): Tool {
             }
           }
         }
-        writeDabBox(layer, patch);
+        writeDabBox(surface, patch);
       };
 
-      engine.begin(toBufferSample(pointer, layer));
+      engine.begin(toBufferSample(pointer, surface));
       context.invalidateComposite();
     },
 

@@ -18,6 +18,9 @@ import { FloodRunner } from './core/flood-runner';
 import { cloneGradient, gradientPresets } from './core/gradient';
 import type { GradientDefinition } from './core/gradient';
 import { rasteriseLayer } from './core/layer-ops';
+import {
+  addMask, addMaskFromSelection, applyMask, deleteMask,
+} from './core/mask-ops';
 import { builtInPatterns, patternFromSelection } from './core/patterns';
 import type { PatternDefinition } from './core/patterns';
 import { SelectionMask } from './core/selection';
@@ -126,6 +129,11 @@ function boot(): void {
   const infoPanel = new InfoPanel((message) => notices.show(message));
   shell.panels.append(layersPanel.root, infoPanel.root, historyPanel.root);
 
+  layersPanel.onMaskViewChanged = (layerId) => {
+    compositor.setMaskPreview(layerId);
+    renderer.invalidate();
+  };
+
   attachHistoryShortcuts(history);
   attachLayerShortcuts(layersPanel);
 
@@ -233,6 +241,7 @@ function boot(): void {
       renderer.invalidate();
     },
     readSourcePixels: (allLayers) => readSourcePixels(allLayers),
+    drawingTarget: () => layersPanel.drawingTarget,
   });
 
   // Marching ants sit under the active tool's own overlay, and are drawn for
@@ -486,6 +495,73 @@ function boot(): void {
     {
       label: 'Layer',
       items: [
+        {
+          label: 'Add Layer Mask',
+          run: () => {
+            const layer = doc.getActiveLayer();
+            if (!layer) return;
+            if (!addMask(doc, history, layer.id, 'reveal')) {
+              notices.show('That layer already has a mask.');
+              return;
+            }
+            thumbnails.markAllDirty();
+            documentChanged();
+          },
+        },
+        {
+          label: 'Add Mask Hiding All',
+          run: () => {
+            const layer = doc.getActiveLayer();
+            if (!layer) return;
+            if (!addMask(doc, history, layer.id, 'hide')) {
+              notices.show('That layer already has a mask.');
+              return;
+            }
+            thumbnails.markAllDirty();
+            documentChanged();
+          },
+        },
+        {
+          label: 'Mask from Selection',
+          run: () => {
+            const layer = doc.getActiveLayer();
+            const selection = doc.selection;
+            if (!layer) return;
+            if (!selection) {
+              notices.show('Select something first.', 'The selection becomes the mask.');
+              return;
+            }
+            addMaskFromSelection(doc, history, layer.id, selection);
+            thumbnails.markAllDirty();
+            documentChanged();
+          },
+        },
+        {
+          label: 'Apply Mask',
+          run: () => {
+            const layer = doc.getActiveLayer();
+            if (!layer || !applyMask(doc, history, layer.id)) {
+              notices.show('That layer has no mask to apply.');
+              return;
+            }
+            layersPanel.setDrawingTarget('layer');
+            thumbnails.markAllDirty();
+            documentChanged();
+          },
+        },
+        {
+          label: 'Delete Mask',
+          run: () => {
+            const layer = doc.getActiveLayer();
+            if (!layer || !deleteMask(doc, history, layer.id)) {
+              notices.show('That layer has no mask.');
+              return;
+            }
+            layersPanel.setDrawingTarget('layer');
+            thumbnails.markAllDirty();
+            documentChanged();
+          },
+        },
         {
           label: 'Rasterise Layer',
           run: () => {

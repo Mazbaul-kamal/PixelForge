@@ -18,6 +18,7 @@ export interface ToolManagerDeps {
   invalidateComposite: () => void;
   setLiveStroke: (stroke: LiveStroke | null) => void;
   readSourcePixels: (allLayers: boolean) => ImageData | null;
+  drawingTarget: () => 'layer' | 'mask';
 }
 
 function defaultsOf(specs: readonly OptionSpec[]): Map<string, unknown> {
@@ -82,6 +83,9 @@ export class ToolManager {
       },
       get selection() {
         return deps.doc.selection;
+      },
+      get drawingTarget() {
+        return deps.drawingTarget();
       },
       requestRender: deps.requestRender,
       invalidateComposite: deps.invalidateComposite,

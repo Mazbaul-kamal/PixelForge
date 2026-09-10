@@ -12,6 +12,7 @@ import {
   setLayerLocked,
   setLayerVisibility,
 } from '../../core/layer-ops';
+import { setClipped, setMaskEnabled, setMaskLinked } from '../../core/mask-ops';
 import { selectLayerAlpha } from '../../core/selection-ops';
 import { BLEND_MODES } from '../../core/types';
 import type { BlendMode, Layer } from '../../core/types';
@@ -60,6 +61,11 @@ export class LayersPanel {
   private readonly rows = new Map<string, LayerRow>();
   private readonly selected = new Set<string>();
   private anchorId: string | null = null;
+  /** Whether painting lands on the active layer's pixels or on its mask. */
+  private paintTarget: 'layer' | 'mask' = 'layer';
+  /** Set while Alt+clicking a mask thumbnail shows it on its own. */
+  private maskViewId: string | null = null;
+  onMaskViewChanged: ((layerId: string | null) => void) | null = null;
   private renderedOrder = '';
   private opacityTx: Transaction | null = null;
   private readonly detachers: Array<() => void> = [];
@@ -214,6 +220,18 @@ export class LayersPanel {
 
   get listElement(): HTMLElement {
     return this.list;
+  }
+
+  /** Read by the tool manager: what painting currently targets. */
+  get drawingTarget(): 'layer' | 'mask' {
+    const layer = this.doc.getActiveLayer();
+    if (!layer || !layer.mask) return 'layer';
+    return this.paintTarget;
+  }
+
+  setDrawingTarget(target: 'layer' | 'mask'): void {
+    this.paintTarget = target;
+    this.render();
   }
 
   // ---- internals ----
@@ -378,6 +396,16 @@ export class LayersPanel {
       }
     }
 
+    if (event.altKey) {
+      // Alt+click a row clips it to the layer beneath, or releases it.
+      const layer = this.doc.getLayer(id);
+      if (layer) {
+        setClipped(this.doc, this.history, id, layer.clipped !== true);
+        this.onChanged();
+      }
+      return;
+    }
+
     if (event.ctrlKey || event.metaKey) {
       if (this.selected.has(id) && this.selected.size > 1) this.selected.delete(id);
       else this.selected.add(id);
@@ -421,6 +449,35 @@ export class LayersPanel {
                 selectLayerAlpha(this.doc, this.history, id);
                 this.onChanged();
               },
+              onPickSurface: (id, surface) => {
+                this.doc.setActiveLayer(id);
+                this.paintTarget = surface;
+                // Choosing a surface leaves the mask-alone view.
+                if (this.maskViewId) {
+                  this.maskViewId = null;
+                  this.onMaskViewChanged?.(null);
+                }
+                this.render();
+                this.onChanged();
+              },
+              onMaskModifier: (id, modifier) => {
+                const layer = this.doc.getLayer(id);
+                if (!layer || !layer.mask) return;
+
+                if (modifier === 'toggle') {
+                  setMaskEnabled(this.doc, this.history, id, layer.maskEnabled === false);
+                } else {
+                  this.maskViewId = this.maskViewId === id ? null : id;
+                  this.onMaskViewChanged?.(this.maskViewId);
+                }
+                this.onChanged();
+              },
+              onToggleMaskLink: (id) => {
+                const layer = this.doc.getLayer(id);
+                if (!layer) return;
+                setMaskLinked(this.doc, this.history, id, layer.maskLinked === false);
+                this.onChanged();
+              },
             }),
           );
         }
@@ -435,6 +492,7 @@ export class LayersPanel {
       this.rows.get(layer.id)?.update(layer, {
         active: layer.id === this.doc.activeLayerId,
         selected: this.selected.has(layer.id),
+        target: this.paintTarget,
       });
     }
 

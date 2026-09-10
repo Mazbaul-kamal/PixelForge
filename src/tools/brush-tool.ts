@@ -1,10 +1,10 @@
 import { blendModeToComposite, BLEND_MODES } from '../core/types';
-import type { BlendMode, Layer, Point } from '../core/types';
+import type { BlendMode, Point } from '../core/types';
 import {
   beginStrokeSession,
   commitStroke,
   drawCursorOutline,
-  paintableLayer,
+  paintableSurface,
   readBrushSettings,
   stepBrushSize,
   strokeOptions,
@@ -37,10 +37,11 @@ export function createBrushTool(): Tool {
 
   const showLive = (context: ToolContext, active: StrokeSession): void => {
     context.setLiveStroke({
-      layerId: active.layer.id,
+      layerId: active.surface.layer.id,
       canvas: active.buffer,
       opacity: context.options.get<number>('opacity') / 100,
       composite: compositeOf(context),
+      target: active.surface.isMask ? 'mask' : 'layer',
     });
   };
 
@@ -53,11 +54,11 @@ export function createBrushTool(): Tool {
     options: [...strokeOptions(), BLEND_MODE_OPTION],
 
     onPointerDown(context: ToolContext, pointer: ToolPointer): void {
-      const layer: Layer | null = paintableLayer(context);
-      if (!layer) return;
+      const surface = paintableSurface(context);
+      if (!surface) return;
 
-      session = beginStrokeSession(layer, readBrushSettings(context, context.colours.foreground));
-      session.engine.begin(toBufferSample(pointer, layer));
+      session = beginStrokeSession(surface, readBrushSettings(context, context.colours.foreground));
+      session.engine.begin(toBufferSample(pointer, surface));
       showLive(context, session);
       context.invalidateComposite();
     },
@@ -75,7 +76,7 @@ export function createBrushTool(): Tool {
       // Consume every coalesced sample: a high-refresh stylus reports several
       // per frame, and dropping them makes fast strokes look polygonal.
       for (const sample of pointer.coalesced) {
-        active.engine.extend(toBufferSample(sample, active.layer));
+        active.engine.extend(toBufferSample(sample, active.surface));
       }
 
       showLive(context, active);
@@ -93,12 +94,12 @@ export function createBrushTool(): Tool {
 
       // The buffer holds the whole stroke at full alpha, so opacity is applied
       // exactly once here. Stamping at opacity would darken self-overlaps.
-      commitStroke(context, active, 'Brush Stroke', (layerCtx, buffer) => {
-        layerCtx.save();
-        layerCtx.globalAlpha = opacity;
-        layerCtx.globalCompositeOperation = composite;
-        layerCtx.drawImage(buffer, 0, 0);
-        layerCtx.restore();
+      commitStroke(context, active, 'Brush Stroke', (surfaceCtx, buffer) => {
+        surfaceCtx.save();
+        surfaceCtx.globalAlpha = opacity;
+        surfaceCtx.globalCompositeOperation = composite;
+        surfaceCtx.drawImage(buffer, 0, 0);
+        surfaceCtx.restore();
       });
     },
 

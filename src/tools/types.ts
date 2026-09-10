@@ -92,6 +92,11 @@ export interface ToolContext {
   readonly options: ToolOptions;
   readonly activeLayer: Layer | null;
   readonly selection: SelectionMask | null;
+  /**
+   * Whether painting currently lands on the layer's pixels or on its mask.
+   * Tools never branch on this; they ask for a surface and paint into it.
+   */
+  readonly drawingTarget: 'layer' | 'mask';
   /** Ask for a repaint of the view. */
   requestRender(): void;
   /** Report that layer pixels or layer properties changed. */

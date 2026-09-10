@@ -1,11 +1,12 @@
 import { healRegion, MAX_HEAL_PIXELS } from '../core/heal';
 import { captureLayerPixels, restoreLayerPixels } from '../core/snapshot';
 import { StrokeEngine } from '../core/stroke-engine';
-import type { Layer, Point } from '../core/types';
+import type { Point } from '../core/types';
 import {
-  drawCursorOutline, paintableLayer, readBrushSettings, stepBrushSize, strokeOptions,
+  drawCursorOutline, paintableSurface, readBrushSettings, stepBrushSize, strokeOptions,
   toBufferSample,
 } from './stroke-tool';
+import type { PaintSurface } from './stroke-tool';
 import type { Tool, ToolContext, ToolPointer } from './types';
 
 export interface HealDeps {
@@ -23,7 +24,7 @@ export interface HealDeps {
 export function createSpotHealingTool(deps: HealDeps): Tool {
   let engine: StrokeEngine | null = null;
   let maskCanvas: HTMLCanvasElement | null = null;
-  let target: Layer | null = null;
+  let target: PaintSurface | null = null;
   let hover: Point | null = null;
 
   const reset = (context: ToolContext): void => {
@@ -45,13 +46,13 @@ export function createSpotHealingTool(deps: HealDeps): Tool {
     ],
 
     onPointerDown(context: ToolContext, pointer: ToolPointer): void {
-      const layer = paintableLayer(context);
-      if (!layer) return;
+      const surface = paintableSurface(context);
+      if (!surface) return;
 
-      target = layer;
+      target = surface;
       maskCanvas = document.createElement('canvas');
-      maskCanvas.width = layer.canvas.width;
-      maskCanvas.height = layer.canvas.height;
+      maskCanvas.width = surface.canvas.width;
+      maskCanvas.height = surface.canvas.height;
 
       const ctx = maskCanvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) return;
@@ -59,13 +60,14 @@ export function createSpotHealingTool(deps: HealDeps): Tool {
       // The mask is painted with the ordinary brush machinery, so a soft edge
       // gives a partial blend rather than a hard patch boundary.
       engine = new StrokeEngine(ctx, readBrushSettings(context, '#ffffff'));
-      engine.begin(toBufferSample(pointer, layer));
+      engine.begin(toBufferSample(pointer, surface));
 
       context.setLiveStroke({
-        layerId: layer.id,
+        layerId: surface.layer.id,
         canvas: maskCanvas,
         opacity: 0.35,
         composite: 'source-over',
+        target: surface.isMask ? 'mask' : 'layer',
       });
       context.invalidateComposite();
     },
@@ -83,13 +85,13 @@ export function createSpotHealingTool(deps: HealDeps): Tool {
     },
 
     onPointerUp(context: ToolContext): void {
-      const layer = target;
+      const surface = target;
       const mask = maskCanvas;
       const painted = engine?.hasPainted ?? false;
       engine?.finish();
       reset(context);
 
-      if (!layer || !mask || !painted) {
+      if (!surface || !mask || !painted) {
         context.invalidateComposite();
         return;
       }
@@ -119,8 +121,8 @@ export function createSpotHealingTool(deps: HealDeps): Tool {
         return;
       }
 
-      const layerCtx = layer.ctx;
-      const source = layerCtx.getImageData(0, 0, layer.canvas.width, layer.canvas.height);
+      const layerCtx = surface.ctx;
+      const source = layerCtx.getImageData(0, 0, surface.canvas.width, surface.canvas.height);
       const iterations = context.options.get<number>('iterations');
 
       const work = new Promise<ReturnType<typeof healRegion>>((resolve) => {
@@ -143,13 +145,14 @@ export function createSpotHealingTool(deps: HealDeps): Tool {
         }
 
         const doc = context.doc;
-        const before = captureLayerPixels(layer);
+        const kind = surface.isMask ? 'mask' : 'layer';
+        const before = captureLayerPixels(surface.layer, kind);
         // Written back through the ImageData we already have, which avoids
         // constructing one from a buffer whose type cannot be narrowed.
         source.data.set(result.pixels);
         layerCtx.putImageData(source, 0, 0);
 
-        const after = captureLayerPixels(layer);
+        const after = captureLayerPixels(surface.layer, kind);
         context.history.push(
           'Spot Healing',
           () => restoreLayerPixels(doc, before),

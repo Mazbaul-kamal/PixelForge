@@ -219,3 +219,50 @@
   outline: 1px solid var(--pf-accent);
   outline-offset: -1px;
 }
+
+/* ---- layer masks ---- */
+.pf-layer-mask {
+  margin-left: 2px;
+}
+
+.pf-layer-thumb.is-paint-target {
+  outline: 2px solid var(--pf-accent);
+  outline-offset: 1px;
+}
+
+.pf-mask-link {
+  width: 12px;
+  padding: 0;
+  color: var(--pf-text-dim);
+  background: none;
+  border: 0;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pf-mask-link:hover {
+  color: var(--pf-text);
+}
+
+.pf-mask-link.is-off {
+  opacity: 0.3;
+  text-decoration: line-through;
+}
+
+/* A clipped layer is indented and points down at what it clips to. */
+.pf-layer-row.is-clipped {
+  padding-left: 20px;
+}
+
+.pf-layer-row.is-clipped::before {
+  content: '⌐';
+  position: absolute;
+  left: 8px;
+  color: var(--pf-text-dim);
+  transform: rotate(180deg);
+}
+
+.pf-layer-row {
+  position: relative;
+}

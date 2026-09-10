@@ -250,6 +250,15 @@ export function createMoveTool(): Tool {
     },
 
     onPointerUp(context: ToolContext): void {
+      const layer = context.activeLayer;
+      if (dragging && layer?.mask && layer.maskLinked === false) {
+        // An unlinked mask holds its place in the document, so its content is
+        // shifted back by however far the layer travelled.
+        const dx = layer.x - startLayer.x;
+        const dy = layer.y - startLayer.y;
+        if (dx !== 0 || dy !== 0) shiftMask(layer.mask, -dx, -dy);
+      }
+
       dragging = false;
       guides = [];
 
@@ -377,4 +386,19 @@ export function createMoveTool(): Tool {
       commitFloat(context);
     },
   };
+}
+
+/** Moves a mask's content inside its own canvas. */
+function shiftMask(mask: HTMLCanvasElement, dx: number, dy: number): void {
+  const ctx = mask.getContext('2d');
+  if (!ctx) return;
+
+  const copy = document.createElement('canvas');
+  copy.width = mask.width;
+  copy.height = mask.height;
+  copy.getContext('2d')?.drawImage(mask, 0, 0);
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, mask.width, mask.height);
+  ctx.drawImage(copy, Math.round(dx), Math.round(dy));
 }

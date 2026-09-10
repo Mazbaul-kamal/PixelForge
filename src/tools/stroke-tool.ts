@@ -62,22 +62,48 @@ export function readBrushSettings(
   };
 }
 
-export interface StrokeSession {
+/**
+ * Where a painting tool actually draws: the layer's pixels, or its mask.
+ *
+ * Tools ask for one of these and paint into it. Nothing inside a tool knows
+ * which it got, so masks needed no special-casing anywhere.
+ */
+export interface PaintSurface {
   readonly layer: Layer;
+  readonly canvas: HTMLCanvasElement;
+  readonly ctx: CanvasRenderingContext2D;
+  readonly isMask: boolean;
+}
+
+export interface StrokeSession {
+  readonly surface: PaintSurface;
   readonly buffer: HTMLCanvasElement;
   readonly bufferCtx: CanvasRenderingContext2D;
   readonly engine: StrokeEngine;
 }
 
-export function beginStrokeSession(layer: Layer, settings: BrushSettings): StrokeSession {
+export function beginStrokeSession(surface: PaintSurface, settings: BrushSettings): StrokeSession {
   const buffer = document.createElement('canvas');
-  buffer.width = layer.canvas.width;
-  buffer.height = layer.canvas.height;
+  buffer.width = surface.canvas.width;
+  buffer.height = surface.canvas.height;
 
   const bufferCtx = buffer.getContext('2d');
   if (!bufferCtx) throw new Error('Could not acquire a 2D context for the stroke buffer.');
 
-  return { layer, buffer, bufferCtx, engine: new StrokeEngine(bufferCtx, settings) };
+  return { surface, buffer, bufferCtx, engine: new StrokeEngine(bufferCtx, settings) };
+}
+
+/** The surface to paint on, or null when the layer refuses edits. */
+export function paintableSurface(context: ToolContext): PaintSurface | null {
+  const layer = context.activeLayer;
+  if (!canEditLayer(layer) || !layer) return null;
+
+  if (context.drawingTarget === 'mask' && layer.mask) {
+    const ctx = layer.mask.getContext('2d');
+    if (!ctx) return null;
+    return { layer, canvas: layer.mask, ctx, isMask: true };
+  }
+  return { layer, canvas: layer.canvas, ctx: layer.ctx, isMask: false };
 }
 
 /** True when the layer can be painted on at all. */
@@ -86,8 +112,9 @@ export function paintableLayer(context: ToolContext): Layer | null {
   return canEditLayer(layer) ? layer : null;
 }
 
-/** Converts a pointer sample into the layer-local space the buffer uses. */
-export function toBufferSample(sample: ToolSample, layer: Layer) {
+/** Converts a pointer sample into the surface-local space the buffer uses. */
+export function toBufferSample(sample: ToolSample, surface: PaintSurface | Layer) {
+  const layer = 'layer' in surface ? surface.layer : surface;
   return { x: sample.doc.x - layer.x, y: sample.doc.y - layer.y, pressure: sample.pressure };
 }
 
@@ -100,7 +127,7 @@ export function toBufferSample(sample: ToolSample, layer: Layer) {
 export function clipBufferToSelection(session: StrokeSession, context: ToolContext): void {
   const selection = context.selection;
   if (!selection) return;
-  selection.applyClip(session.bufferCtx, session.layer.x, session.layer.y);
+  selection.applyClip(session.bufferCtx, session.surface.layer.x, session.surface.layer.y);
 }
 
 /**
@@ -111,7 +138,7 @@ export function commitStroke(
   context: ToolContext,
   session: StrokeSession,
   label: string,
-  apply: (layerCtx: CanvasRenderingContext2D, buffer: HTMLCanvasElement) => void,
+  apply: (surfaceCtx: CanvasRenderingContext2D, buffer: HTMLCanvasElement) => void,
 ): void {
   clipBufferToSelection(session, context);
   context.setLiveStroke(null);
@@ -121,13 +148,15 @@ export function commitStroke(
     return;
   }
 
-  const { layer } = session;
+  const { surface } = session;
+  const layer = surface.layer;
   const doc = context.doc;
-  const before = captureLayerPixels(layer);
+  const target = surface.isMask ? 'mask' : 'layer';
+  const before = captureLayerPixels(layer, target);
 
-  apply(layer.ctx, session.buffer);
+  apply(surface.ctx, session.buffer);
 
-  const after = captureLayerPixels(layer);
+  const after = captureLayerPixels(layer, target);
   context.history.push(
     label,
     () => restoreLayerPixels(doc, before),

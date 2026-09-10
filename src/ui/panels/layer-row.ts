@@ -24,11 +24,18 @@ export interface LayerRowCallbacks {
   onRename: (id: string, name: string) => void;
   /** Ctrl or Cmd click on the thumbnail, which loads the layer as a selection. */
   onLoadSelection: (id: string) => void;
+  /** Clicking a thumbnail chooses what painting targets. */
+  onPickSurface: (id: string, surface: 'layer' | 'mask') => void;
+  /** Shift+click a mask disables it, Alt+click views it alone. */
+  onMaskModifier: (id: string, modifier: 'toggle' | 'view') => void;
+  onToggleMaskLink: (id: string) => void;
 }
 
 export interface LayerRowState {
   active: boolean;
   selected: boolean;
+  /** Which surface of THIS layer painting targets, when it is active. */
+  target: 'layer' | 'mask';
 }
 
 /** One row of the layers list. Rebuilt only when the layer list changes. */
@@ -37,6 +44,9 @@ export class LayerRow {
   readonly id: string;
 
   private readonly thumbHost: HTMLElement;
+  private readonly maskHost: HTMLElement;
+  private readonly maskCanvas: HTMLCanvasElement;
+  private readonly linkButton: HTMLButtonElement;
   private readonly nameEl: HTMLElement;
   private readonly badge: HTMLElement;
   private readonly eyeButton: HTMLButtonElement;
@@ -68,9 +78,38 @@ export class LayerRow {
     this.thumbHost.className = 'pf-layer-thumb';
     this.thumbHost.title = 'Ctrl+click to load as a selection';
     this.thumbHost.addEventListener('click', (event) => {
-      if (!event.ctrlKey && !event.metaKey) return;
       event.stopPropagation();
-      callbacks.onLoadSelection(this.id);
+      if (event.ctrlKey || event.metaKey) {
+        callbacks.onLoadSelection(this.id);
+        return;
+      }
+      callbacks.onPickSurface(this.id, 'layer');
+    });
+
+    // ---- mask thumbnail ----
+    this.maskHost = document.createElement('div');
+    this.maskHost.className = 'pf-layer-thumb pf-layer-mask';
+    this.maskHost.title = 'Layer mask. Shift+click to disable, Alt+click to view it alone.';
+    this.maskCanvas = document.createElement('canvas');
+    this.maskCanvas.className = 'pf-thumb-canvas';
+    this.maskCanvas.width = 36;
+    this.maskCanvas.height = 36;
+    this.maskHost.appendChild(this.maskCanvas);
+    this.maskHost.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (event.shiftKey) callbacks.onMaskModifier(this.id, 'toggle');
+      else if (event.altKey) callbacks.onMaskModifier(this.id, 'view');
+      else callbacks.onPickSurface(this.id, 'mask');
+    });
+
+    this.linkButton = document.createElement('button');
+    this.linkButton.type = 'button';
+    this.linkButton.className = 'pf-mask-link';
+    this.linkButton.title = 'Link the mask to the layer';
+    this.linkButton.textContent = '⛓';
+    this.linkButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      callbacks.onToggleMaskLink(this.id);
     });
 
     const meta = document.createElement('div');
@@ -92,7 +131,9 @@ export class LayerRow {
       callbacks.onToggleLock(this.id);
     });
 
-    this.root.append(this.eyeButton, this.thumbHost, meta, this.lockButton);
+    this.root.append(
+      this.eyeButton, this.thumbHost, this.linkButton, this.maskHost, meta, this.lockButton,
+    );
 
     this.root.addEventListener('click', (event) => {
       if (this.editor) return;
@@ -103,7 +144,7 @@ export class LayerRow {
       this.beginRename();
     });
 
-    this.update(layer, { active: false, selected: false });
+    this.update(layer, { active: false, selected: false, target: 'layer' });
   }
 
   update(layer: Layer, state: LayerRowState): void {
@@ -115,6 +156,49 @@ export class LayerRow {
     this.root.classList.toggle('is-selected', state.selected);
     this.root.classList.toggle('is-hidden', !layer.visible);
     this.root.classList.toggle('is-locked', layer.locked);
+    this.root.classList.toggle('is-clipped', layer.clipped === true);
+
+    // ---- mask ----
+    const hasMask = layer.mask !== undefined;
+    this.maskHost.hidden = !hasMask;
+    this.linkButton.hidden = !hasMask;
+
+    if (hasMask && layer.mask) {
+      const ctx = this.maskCanvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+        const scale = Math.min(
+          this.maskCanvas.width / layer.mask.width,
+          this.maskCanvas.height / layer.mask.height,
+        );
+        const w = layer.mask.width * scale;
+        const h = layer.mask.height * scale;
+        ctx.drawImage(
+          layer.mask,
+          (this.maskCanvas.width - w) / 2, (this.maskCanvas.height - h) / 2, w, h,
+        );
+
+        // A disabled mask is struck through in red.
+        if (layer.maskEnabled === false) {
+          ctx.strokeStyle = '#e5624c';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(4, 4);
+          ctx.lineTo(this.maskCanvas.width - 4, this.maskCanvas.height - 4);
+          ctx.moveTo(this.maskCanvas.width - 4, 4);
+          ctx.lineTo(4, this.maskCanvas.height - 4);
+          ctx.stroke();
+        }
+      }
+      this.linkButton.classList.toggle('is-off', layer.maskLinked === false);
+    }
+
+    // The focus ring says which surface painting will land on.
+    const targetsMask = state.active && state.target === 'mask' && hasMask;
+    this.thumbHost.classList.toggle('is-paint-target', state.active && !targetsMask);
+    this.maskHost.classList.toggle('is-paint-target', targetsMask);
     this.root.setAttribute('aria-selected', state.selected ? 'true' : 'false');
 
     this.eyeButton.replaceChildren(icon(layer.visible ? EYE_OPEN : EYE_CLOSED));

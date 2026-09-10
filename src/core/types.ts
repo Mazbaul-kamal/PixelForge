@@ -78,8 +78,17 @@ export interface Layer {
   visible: boolean;
   locked: boolean;
   type: LayerType;
-  /** Layer mask bitmap. Applied by the mask engine in a later step. */
+  /**
+   * Layer mask: greyscale at layer size, white reveals and black hides.
+   * Applied by the compositor, never baked into the pixels until asked.
+   */
   mask?: HTMLCanvasElement;
+  /** A disabled mask stays attached but stops affecting the composite. */
+  maskEnabled?: boolean;
+  /** When linked, moving the layer moves its mask with it. On by default. */
+  maskLinked?: boolean;
+  /** Clipped layers are limited to the alpha of the layer beneath them. */
+  clipped?: boolean;
   /**
    * Set on text layers. The bitmap is only a render of this, so the string and
    * its style stay editable. Immutable: edits replace the whole object.

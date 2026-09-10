@@ -19,6 +19,8 @@ export interface PixelSnapshot {
   readonly width: number;
   readonly height: number;
   readonly bitmap: HTMLCanvasElement;
+  /** Which surface of the layer this came from. */
+  readonly target: 'layer' | 'mask';
 }
 
 interface LayerRecord {
@@ -34,6 +36,9 @@ interface LayerRecord {
   readonly locked: boolean;
   readonly type: LayerType;
   readonly mask: HTMLCanvasElement | undefined;
+  readonly maskEnabled: boolean;
+  readonly maskLinked: boolean;
+  readonly clipped: boolean;
   readonly text: TextLayerData | undefined;
   readonly shape: ShapeData | undefined;
 }
@@ -58,12 +63,14 @@ function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   return copy;
 }
 
-export function captureLayerPixels(layer: Layer): PixelSnapshot {
+export function captureLayerPixels(layer: Layer, target: 'layer' | 'mask' = 'layer'): PixelSnapshot {
+  const surface = target === 'mask' && layer.mask ? layer.mask : layer.canvas;
   return {
     layerId: layer.id,
-    width: layer.canvas.width,
-    height: layer.canvas.height,
-    bitmap: cloneCanvas(layer.canvas),
+    width: surface.width,
+    height: surface.height,
+    bitmap: cloneCanvas(surface),
+    target: target === 'mask' && layer.mask ? 'mask' : 'layer',
   };
 }
 
@@ -72,7 +79,10 @@ export function restoreLayerPixels(doc: PixelDocument, snapshot: PixelSnapshot):
   const layer = doc.getLayer(snapshot.layerId);
   if (!layer) return;
 
-  const { canvas, ctx } = layer;
+  const canvas = snapshot.target === 'mask' ? layer.mask : layer.canvas;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
   if (canvas.width !== snapshot.width || canvas.height !== snapshot.height) {
     // Resizing resets the drawing state but keeps the context object valid.
     canvas.width = snapshot.width;
@@ -104,6 +114,9 @@ export function captureDocument(doc: PixelDocument): DocumentSnapshot {
       locked: layer.locked,
       type: layer.type,
       mask: layer.mask,
+      maskEnabled: layer.maskEnabled !== false,
+      maskLinked: layer.maskLinked !== false,
+      clipped: layer.clipped === true,
       text: layer.text,
       shape: layer.shape,
     })),
@@ -136,6 +149,9 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
     layer.type = record.type;
     if (record.mask) layer.mask = record.mask;
     else delete layer.mask;
+    layer.maskEnabled = record.maskEnabled;
+    layer.maskLinked = record.maskLinked;
+    layer.clipped = record.clipped;
     if (record.text) layer.text = record.text;
     else delete layer.text;
     if (record.shape) layer.shape = record.shape;
@@ -167,6 +183,9 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
     type: record.type,
   };
   if (record.mask) rebuilt.mask = record.mask;
+  rebuilt.maskEnabled = record.maskEnabled;
+  rebuilt.maskLinked = record.maskLinked;
+  rebuilt.clipped = record.clipped;
   if (record.text) rebuilt.text = record.text;
   if (record.shape) rebuilt.shape = record.shape;
   return rebuilt;
@@ -199,6 +218,9 @@ export function documentSnapshotsEqual(a: DocumentSnapshot, b: DocumentSnapshot)
       left.locked !== right.locked ||
       left.type !== right.type ||
       left.mask !== right.mask ||
+      left.maskEnabled !== right.maskEnabled ||
+      left.maskLinked !== right.maskLinked ||
+      left.clipped !== right.clipped ||
       left.text !== right.text ||
       left.shape !== right.shape
     ) {

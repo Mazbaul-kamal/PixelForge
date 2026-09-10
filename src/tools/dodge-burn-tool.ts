@@ -5,11 +5,12 @@ import type { ToneRange } from '../core/pixel-brush';
 import { captureLayerPixels, restoreLayerPixels } from '../core/snapshot';
 import { StrokeEngine } from '../core/stroke-engine';
 import type { PixelSnapshot } from '../core/snapshot';
-import type { Layer, Point } from '../core/types';
+import type { Point } from '../core/types';
 import {
-  drawCursorOutline, paintableLayer, readBrushSettings, stepBrushSize, strokeOptions,
+  drawCursorOutline, paintableSurface, readBrushSettings, stepBrushSize, strokeOptions,
   toBufferSample,
 } from './stroke-tool';
+import type { PaintSurface } from './stroke-tool';
 import type { Tool, ToolContext, ToolPointer } from './types';
 
 export interface DodgeBurnDeps {
@@ -25,22 +26,22 @@ export interface DodgeBurnDeps {
  */
 export function createDodgeBurnTool(mode: 'dodge' | 'burn', deps: DodgeBurnDeps): Tool {
   let engine: StrokeEngine | null = null;
-  let target: Layer | null = null;
+  let target: PaintSurface | null = null;
   let before: PixelSnapshot | null = null;
   let hover: Point | null = null;
 
   const finish = (context: ToolContext): void => {
-    const layer = target;
+    const surface = target;
     const start = before;
     const painted = engine?.hasPainted ?? false;
     engine = null;
     target = null;
     before = null;
 
-    if (!layer || !start || !painted) return;
+    if (!surface || !start || !painted) return;
 
     const doc = context.doc;
-    const after = captureLayerPixels(layer);
+    const after = captureLayerPixels(surface.layer, surface.isMask ? 'mask' : 'layer');
     context.history.push(
       mode === 'dodge' ? 'Dodge' : 'Burn',
       () => restoreLayerPixels(doc, start),
@@ -71,13 +72,14 @@ export function createDodgeBurnTool(mode: 'dodge' | 'burn', deps: DodgeBurnDeps)
     ],
 
     onPointerDown(context: ToolContext, pointer: ToolPointer): void {
-      const layer = paintableLayer(context);
-      if (!layer) return;
+      const surface = paintableSurface(context);
+      if (!surface) return;
 
-      target = layer;
+      target = surface;
+      const layer = surface.layer;
       // One snapshot for the whole stroke, so it is a single undo even though
       // the pixels are written dab by dab.
-      before = captureLayerPixels(layer);
+      before = captureLayerPixels(layer, surface.isMask ? 'mask' : 'layer');
 
       const range = context.options.get<string>('range') as ToneRange;
       const exposure = context.options.get<number>('exposure') / 100;
@@ -85,9 +87,9 @@ export function createDodgeBurnTool(mode: 'dodge' | 'burn', deps: DodgeBurnDeps)
       const hardness = context.options.get<number>('hardness') / 100;
       const selection = context.selection;
 
-      engine = new StrokeEngine(layer.ctx, readBrushSettings(context, '#000000'));
+      engine = new StrokeEngine(surface.ctx, readBrushSettings(context, '#000000'));
       engine.onDab = (dab) => {
-        const patch = dabBox(layer, dab);
+        const patch = dabBox(surface, dab);
         if (!patch) return;
 
         const pixels = patch.image.data;
@@ -145,10 +147,10 @@ export function createDodgeBurnTool(mode: 'dodge' | 'burn', deps: DodgeBurnDeps)
             }
           }
         }
-        writeDabBox(layer, patch);
+        writeDabBox(surface, patch);
       };
 
-      engine.begin(toBufferSample(pointer, layer));
+      engine.begin(toBufferSample(pointer, surface));
       context.invalidateComposite();
     },
 

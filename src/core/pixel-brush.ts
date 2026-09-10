@@ -1,5 +1,10 @@
 import type { Dab } from './stroke-engine';
-import type { Layer } from './types';
+
+/** Anything with a canvas and a context: a layer's pixels, or its mask. */
+export interface PixelSurface {
+  readonly canvas: HTMLCanvasElement;
+  readonly ctx: CanvasRenderingContext2D;
+}
 
 /**
  * Helpers for brushes that read and write the layer bitmap per dab.
@@ -17,7 +22,7 @@ export interface DabPatch {
   readonly height: number;
 }
 
-export function dabBox(layer: Layer, dab: Dab): DabPatch | null {
+export function dabBox(layer: PixelSurface, dab: Dab): DabPatch | null {
   const reach = Math.ceil(dab.radius) + 1;
   const left = Math.max(0, Math.floor(dab.x - reach));
   const top = Math.max(0, Math.floor(dab.y - reach));
@@ -31,7 +36,7 @@ export function dabBox(layer: Layer, dab: Dab): DabPatch | null {
   return { image: layer.ctx.getImageData(left, top, width, height), left, top, width, height };
 }
 
-export function writeDabBox(layer: Layer, patch: DabPatch): void {
+export function writeDabBox(layer: PixelSurface, patch: DabPatch): void {
   layer.ctx.putImageData(patch.image, patch.left, patch.top);
 }
 

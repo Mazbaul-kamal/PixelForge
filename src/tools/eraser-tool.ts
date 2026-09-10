@@ -1,11 +1,11 @@
 import { captureLayerPixels } from '../core/snapshot';
 import type { PixelSnapshot } from '../core/snapshot';
-import type { Layer, Point } from '../core/types';
+import type { Point } from '../core/types';
 import {
   beginStrokeSession,
   commitStroke,
   drawCursorOutline,
-  paintableLayer,
+  paintableSurface,
   readBrushSettings,
   stepBrushSize,
   strokeOptions,
@@ -75,12 +75,13 @@ export function createEraserTool(): Tool {
 
   const showLive = (context: ToolContext, active: StrokeSession): void => {
     context.setLiveStroke({
-      layerId: active.layer.id,
+      layerId: active.surface.layer.id,
       canvas: active.buffer,
       opacity: context.options.get<number>('opacity') / 100,
       // A restoring stroke has no honest live preview, because the pixels it
       // brings back are not in the buffer; it is applied on commit instead.
       composite: restoring ? 'source-over' : compositeFor(context),
+      target: active.surface.isMask ? 'mask' : 'layer',
     });
   };
 
@@ -116,15 +117,15 @@ export function createEraserTool(): Tool {
     },
 
     onPointerDown(context: ToolContext, pointer: ToolPointer): void {
-      const layer: Layer | null = paintableLayer(context);
-      if (!layer) return;
+      const surface = paintableSurface(context);
+      if (!surface) return;
 
       refreshCheckpoint(context);
       // Alt turns the eraser into a history brush for the duration of a stroke.
-      restoring = pointer.altKey && checkpoint !== null && checkpointLayerId === layer.id;
+      restoring = pointer.altKey && checkpoint !== null && checkpointLayerId === surface.layer.id;
 
-      session = beginStrokeSession(layer, settingsFor(context));
-      session.engine.begin(toBufferSample(pointer, layer));
+      session = beginStrokeSession(surface, settingsFor(context));
+      session.engine.begin(toBufferSample(pointer, surface));
       showLive(context, session);
       context.invalidateComposite();
     },
@@ -140,7 +141,7 @@ export function createEraserTool(): Tool {
 
       active.engine.update(settingsFor(context));
       for (const sample of pointer.coalesced) {
-        active.engine.extend(toBufferSample(sample, active.layer));
+        active.engine.extend(toBufferSample(sample, active.surface));
       }
 
       showLive(context, active);
