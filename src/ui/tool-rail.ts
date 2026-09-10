@@ -51,7 +51,11 @@ const BURN_ICON =
 const SMUDGE_ICON =
   '<path d="M6 15.5c0-3 2-4.5 4-6.5s3-3.5 3-5"/><circle cx="6" cy="16" r="1.8"/>';
 
+const TRANSFORM_ICON =
+  '<rect x="4" y="4" width="12" height="12" stroke-dasharray="3 2"/><rect x="2" y="2" width="4" height="4"/><rect x="14" y="14" width="4" height="4"/>';
+
 const ICONS: Record<string, string> = {
+  transform: TRANSFORM_ICON,
   dodge: DODGE_ICON,
   burn: BURN_ICON,
   smudge: SMUDGE_ICON,

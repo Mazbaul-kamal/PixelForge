@@ -28,6 +28,7 @@ import { createCropTool } from './tools/crop-tool';
 import { createCloneStampTool } from './tools/clone-stamp-tool';
 import { createDodgeBurnTool } from './tools/dodge-burn-tool';
 import { createSmudgeTool } from './tools/smudge-tool';
+import { createTransformTool } from './tools/transform-tool';
 import { createShapeTool } from './tools/shape-tool';
 import { createSpotHealingTool } from './tools/spot-healing-tool';
 import { createTextTool } from './tools/text-tool';
@@ -328,6 +329,29 @@ function boot(): void {
   toolManager.register(createDodgeBurnTool('dodge', pixelBrushDeps));
   toolManager.register(createDodgeBurnTool('burn', pixelBrushDeps));
   toolManager.register(createSmudgeTool(pixelBrushDeps));
+
+  // Free transform is modal: Ctrl+T enters it and Enter or Escape returns to
+  // whichever tool was in use before.
+  let toolBeforeTransform: string | null = null;
+  toolManager.register(
+    createTransformTool({
+      onChanged: () => { thumbnails.markAllDirty(); documentChanged(); },
+      onExit: () => {
+        const previous = toolBeforeTransform;
+        toolBeforeTransform = null;
+        if (previous) toolManager.setActiveTool(previous);
+      },
+    }),
+  );
+
+  window.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+    if (event.key.toLowerCase() !== 't') return;
+    event.preventDefault();
+    if (toolManager.activeTool?.id === 'transform') return;
+    toolBeforeTransform = toolManager.activeTool?.id ?? null;
+    toolManager.setActiveTool('transform');
+  });
 
   toolManager.register(
     createSpotHealingTool({
