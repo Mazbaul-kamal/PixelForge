@@ -343,3 +343,97 @@
 .pf-warning {
   color: #e5a04c;
 }
+
+/* The effects editor needs two columns, so it gets more room than the
+   ordinary dialog width allows. */
+.pf-dialog:has(.pf-style-dialog) {
+  max-width: min(640px, calc(100vw - 32px));
+}
+
+.pf-style-dialog {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.pf-style-list {
+  flex: 0 0 154px;
+  border: 1px solid var(--pf-line);
+  border-radius: 4px;
+  background: var(--pf-bg-sunken);
+  padding: 4px;
+  align-self: flex-start;
+}
+
+.pf-style-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pf-style-item:hover { background: rgba(255, 255, 255, 0.05); }
+.pf-style-item.is-selected { background: var(--pf-accent); color: #fff; }
+
+.pf-style-settings {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pf-style-heading {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pf-style-hint {
+  margin: -4px 0 10px;
+  color: var(--pf-text-dim);
+  font-size: 11px;
+}
+
+.pf-style-row {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.pf-style-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pf-style-slider .pf-slider { flex: 1 1 auto; min-width: 0; }
+
+.pf-style-value {
+  flex: 0 0 46px;
+  text-align: right;
+  font-family: var(--pf-font-mono);
+  font-size: 11px;
+  color: var(--pf-text-dim);
+}
+
+.pf-colour-input {
+  width: 44px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+}
+
+.pf-layer-fx {
+  margin-left: 6px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--pf-accent);
+  font-weight: 700;
+}

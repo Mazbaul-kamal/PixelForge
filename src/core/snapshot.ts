@@ -1,6 +1,7 @@
 import type { PixelDocument } from './document';
 import type { SelectionMask } from './selection';
 import type { AdjustmentData } from './adjustments';
+import type { LayerStyles } from './layer-styles';
 import type { ShapeData } from './shape-layer';
 import type { TextLayerData } from './text-layer';
 import type { BlendMode, Layer, LayerType } from './types';
@@ -43,6 +44,9 @@ interface LayerRecord {
   readonly text: TextLayerData | undefined;
   readonly shape: ShapeData | undefined;
   readonly adjustment: AdjustmentData | undefined;
+  /** Held by reference: an edit replaces the whole styles object. */
+  readonly styles: LayerStyles | undefined;
+  readonly stylesEnabled: boolean;
   readonly parentId: string | undefined;
   readonly collapsed: boolean;
 }
@@ -124,6 +128,8 @@ export function captureDocument(doc: PixelDocument): DocumentSnapshot {
       text: layer.text,
       shape: layer.shape,
       adjustment: layer.adjustment,
+      styles: layer.styles,
+      stylesEnabled: layer.stylesEnabled !== false,
       parentId: layer.parentId,
       collapsed: layer.collapsed === true,
     })),
@@ -165,6 +171,9 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
     else delete layer.shape;
     if (record.adjustment) layer.adjustment = record.adjustment;
     else delete layer.adjustment;
+    if (record.styles) layer.styles = record.styles;
+    else delete layer.styles;
+    layer.stylesEnabled = record.stylesEnabled;
     if (record.parentId) layer.parentId = record.parentId;
     else delete layer.parentId;
     layer.collapsed = record.collapsed;
@@ -201,6 +210,8 @@ function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
   if (record.text) rebuilt.text = record.text;
   if (record.shape) rebuilt.shape = record.shape;
   if (record.adjustment) rebuilt.adjustment = record.adjustment;
+  if (record.styles) rebuilt.styles = record.styles;
+  rebuilt.stylesEnabled = record.stylesEnabled;
   if (record.parentId) rebuilt.parentId = record.parentId;
   rebuilt.collapsed = record.collapsed;
   return rebuilt;
@@ -239,6 +250,8 @@ export function documentSnapshotsEqual(a: DocumentSnapshot, b: DocumentSnapshot)
       left.text !== right.text ||
       left.shape !== right.shape ||
       left.adjustment !== right.adjustment ||
+      left.styles !== right.styles ||
+      left.stylesEnabled !== right.stylesEnabled ||
       left.parentId !== right.parentId ||
       left.collapsed !== right.collapsed
     ) {

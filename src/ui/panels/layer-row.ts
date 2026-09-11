@@ -1,5 +1,6 @@
 import type { Layer } from '../../core/types';
 import type { ThumbnailCache } from '../thumbnails';
+import { STYLE_ORDER } from '../../core/layer-styles';
 
 const EYE_OPEN =
   '<path d="M1 7s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z"/><circle cx="7" cy="7" r="1.9"/>';
@@ -22,6 +23,7 @@ export interface LayerRowCallbacks {
   onToggleLock: (id: string) => void;
   onPick: (id: string, event: MouseEvent) => void;
   onRename: (id: string, name: string) => void;
+  onEditStyles: (id: string) => void;
   /** Ctrl or Cmd click on the thumbnail, which loads the layer as a selection. */
   onLoadSelection: (id: string) => void;
   /** Clicking a thumbnail chooses what painting targets. */
@@ -53,6 +55,7 @@ export class LayerRow {
   private readonly disclosure: HTMLButtonElement;
   private readonly nameEl: HTMLElement;
   private readonly badge: HTMLElement;
+  private readonly effects: HTMLElement;
   private readonly eyeButton: HTMLButtonElement;
   private readonly lockButton: HTMLButtonElement;
   private readonly thumbs: ThumbnailCache;
@@ -133,7 +136,17 @@ export class LayerRow {
     this.badge = document.createElement('span');
     this.badge.className = 'pf-layer-badge';
 
-    meta.append(this.nameEl, this.badge);
+    this.effects = document.createElement('span');
+    this.effects.className = 'pf-layer-fx';
+    this.effects.title = 'This layer has effects. Double-click to edit them.';
+    this.effects.textContent = 'fx';
+    this.effects.hidden = true;
+    this.effects.addEventListener('dblclick', (event) => {
+      event.stopPropagation();
+      this.callbacks.onEditStyles(this.id);
+    });
+
+    meta.append(this.nameEl, this.badge, this.effects);
 
     this.lockButton = document.createElement('button');
     this.lockButton.type = 'button';
@@ -170,6 +183,8 @@ export class LayerRow {
     this.root.classList.toggle('is-hidden', !layer.visible);
     this.root.classList.toggle('is-locked', layer.locked);
     this.root.classList.toggle('is-clipped', layer.clipped === true);
+    this.effects.hidden = !layerHasEffects(layer);
+    this.effects.classList.toggle('is-off', layer.stylesEnabled === false);
     this.root.style.setProperty('--depth', String(state.depth));
 
     const isGroup = layer.type === 'group';
@@ -274,4 +289,9 @@ export class LayerRow {
     input.focus();
     input.select();
   }
+}
+
+/** Any effect switched on, whether or not the set as a whole is hidden. */
+function layerHasEffects(layer: Layer): boolean {
+  return layer.styles !== undefined && STYLE_ORDER.some((key) => layer.styles![key].enabled);
 }

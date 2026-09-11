@@ -2,6 +2,7 @@ import type { AdjustmentData } from './adjustments';
 import type { PixelDocument } from './document';
 import { createLayer } from './layer';
 import { SelectionMask } from './selection';
+import type { LayerStyles } from './layer-styles';
 import type { ShapeData } from './shape-layer';
 import type { TextLayerData } from './text-layer';
 import type { BlendMode, Layer, LayerType } from './types';
@@ -31,6 +32,8 @@ export interface StoredLayer {
   readonly text?: TextLayerData;
   readonly shape?: ShapeData;
   readonly adjustment?: AdjustmentData;
+  readonly styles?: LayerStyles;
+  readonly stylesEnabled?: boolean;
   /** Key of this layer's bitmap in the blob map. */
   readonly bitmapKey?: string;
   readonly maskKey?: string;
@@ -118,6 +121,7 @@ export async function serialiseProject(
       ...(layer.text ? { text: layer.text } : {}),
       ...(layer.shape ? { shape: layer.shape } : {}),
       ...(layer.adjustment ? { adjustment: layer.adjustment } : {}),
+      ...(layer.styles ? { styles: layer.styles, stylesEnabled: layer.stylesEnabled !== false } : {}),
       ...(bitmapKey ? { bitmapKey } : {}),
       ...(maskKey ? { maskKey } : {}),
     });
@@ -202,6 +206,10 @@ export async function restoreProject(
     if (record.text) layer.text = record.text;
     if (record.shape) layer.shape = record.shape;
     if (record.adjustment) layer.adjustment = record.adjustment;
+    if (record.styles) {
+      layer.styles = record.styles;
+      layer.stylesEnabled = record.stylesEnabled !== false;
+    }
 
     rebuilt.push(layer);
   }

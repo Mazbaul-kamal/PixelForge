@@ -1,5 +1,7 @@
 import { WebGLCompositor } from '../view/webgl-compositor';
 import { createAdjustment } from './adjustments';
+import { hasActiveStyles, renderLayerStyles } from './layer-styles';
+import type { StyledLayer } from './layer-styles';
 import type { PixelDocument } from './document';
 import { TileGrid } from './tiles';
 import type { Rect } from './types';
@@ -43,6 +45,44 @@ function isDrawable(layer: Layer): boolean {
   // Adjustment layers and groups have no bitmap of their own but still count.
   if (isAdjustment(layer) || isGroup(layer)) return true;
   return layer.canvas.width > 0 && layer.canvas.height > 0;
+}
+
+/** Set when the layer list may have changed, so the cache is swept once. */
+let styleCacheDirty = true;
+
+interface StyleCacheEntry {
+  base: HTMLCanvasElement;
+  styles: object;
+  x: number;
+  y: number;
+  result: StyledLayer;
+}
+
+const styleCache = new Map<string, StyleCacheEntry>();
+
+/** Drops cached effect renders for layers that no longer exist. */
+export function pruneStyleCache(liveIds: ReadonlySet<string>): void {
+  for (const id of styleCache.keys()) {
+    if (!liveIds.has(id)) styleCache.delete(id);
+  }
+}
+
+/**
+ * The layer's effects, reusing the last render while the inputs are identical.
+ * Styles objects are replaced wholesale on edit, so identity is enough.
+ */
+export function styledLayerFor(layer: Layer, base: HTMLCanvasElement): StyledLayer | null {
+  if (!hasActiveStyles(layer) || !layer.styles) return null;
+
+  const cached = styleCache.get(layer.id);
+  if (cached && cached.base === base && cached.styles === layer.styles
+    && cached.x === layer.x && cached.y === layer.y) {
+    return cached.result;
+  }
+
+  const result = renderLayerStyles(base, layer.x, layer.y, layer.styles);
+  styleCache.set(layer.id, { base, styles: layer.styles, x: layer.x, y: layer.y, result });
+  return result;
 }
 
 export function hasActiveMask(layer: Layer): boolean {
@@ -142,13 +182,43 @@ export function drawLayers(
 
   for (const layer of layers) {
     if (!isDrawable(layer) || isAdjustment(layer)) continue;
-    ctx.globalAlpha = Math.min(Math.max(layer.opacity, 0), 1);
-    ctx.globalCompositeOperation = blendModeToComposite(layer.blendMode);
-    ctx.drawImage(surfaceFor(layer), layer.x - offsetX, layer.y - offsetY);
+    drawWithStyles(ctx, layer, surfaceFor(layer), offsetX, offsetY);
   }
 
   ctx.globalAlpha = previousAlpha;
   ctx.globalCompositeOperation = previousComposite;
+}
+
+/**
+ * Draws one layer with its effects: the ones that sit behind it first, each
+ * blended against whatever is already in the target, then the layer itself
+ * with its interior effects already baked in.
+ */
+export function drawWithStyles(
+  ctx: CanvasRenderingContext2D,
+  layer: Layer,
+  base: HTMLCanvasElement,
+  offsetX = 0,
+  offsetY = 0,
+): void {
+  const styled = styledLayerFor(layer, base);
+  const opacity = Math.min(Math.max(layer.opacity, 0), 1);
+
+  if (styled) {
+    for (const effect of styled.behind) {
+      ctx.globalAlpha = opacity * effect.opacity;
+      ctx.globalCompositeOperation = blendModeToComposite(effect.blendMode);
+      ctx.drawImage(effect.canvas, effect.x - offsetX, effect.y - offsetY);
+    }
+  }
+
+  const surface = styled ? styled.surface : { canvas: base, x: layer.x, y: layer.y };
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = blendModeToComposite(layer.blendMode);
+  ctx.drawImage(surface.canvas, surface.x - offsetX, surface.y - offsetY);
+
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
 }
 
 /**
@@ -259,6 +329,7 @@ export class Compositor {
   markDirty(): void {
     this.dirty = true;
     this.layerRevision += 1;
+    styleCacheDirty = true;
     this.tiles.markAll();
   }
 
@@ -342,6 +413,11 @@ export class Compositor {
   private compose(): void {
     const { ctx, doc } = this;
     const started = performance.now();
+
+    if (styleCacheDirty) {
+      pruneStyleCache(new Set(doc.layers.map((layer) => layer.id)));
+      styleCacheDirty = false;
+    }
 
     if (this.glWanted) {
       const gl = this.ensureGl();
@@ -467,12 +543,14 @@ export class Compositor {
 
     if (isGroup(layer)) {
       ctx.drawImage(this.renderGroup(layer, ctx.canvas.width, ctx.canvas.height), 0, 0);
-    } else {
-      ctx.drawImage(surfaceFor(layer, this.live ?? undefined), layer.x, layer.y);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      return;
     }
 
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+    drawWithStyles(ctx, layer, surfaceFor(layer, this.live ?? undefined));
   }
 
   /**

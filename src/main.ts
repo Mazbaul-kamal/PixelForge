@@ -60,6 +60,8 @@ import { createAppShell } from './ui/shell';
 import { attachFileInput } from './ui/file-drop';
 import { FileActions } from './ui/file-actions';
 import { buildMenuBar } from './ui/menubar';
+import { clearLayerStyles, openLayerStyles, toggleLayerStyles } from './ui/layer-style-commands';
+import type { LayerStyleDeps } from './ui/layer-style-commands';
 import { attachColourShortcuts } from './ui/colour-shortcuts';
 import { ColourSwatches } from './ui/colour-swatches';
 import { BusyIndicator } from './ui/busy-indicator';
@@ -563,6 +565,23 @@ function boot(): void {
   });
   document.body.appendChild(projectZipPicker);
 
+  const layerStyleDeps: LayerStyleDeps = {
+    doc,
+    history,
+    repaint: () => {
+      compositor.markDirty();
+      renderer.invalidate();
+    },
+    changed: () => {
+      thumbnails.markAllDirty();
+      compositor.markDirty();
+      documentChanged();
+      layersPanel.refresh();
+    },
+    notify: (message, detail) => notices.show(message, detail),
+  };
+  layersPanel.onEditStyles = () => openLayerStyles(layerStyleDeps);
+
   buildMenuBar(shell.menuBar, [
     {
       label: 'File',
@@ -612,6 +631,18 @@ function boot(): void {
     {
       label: 'Layer',
       items: [
+        {
+          label: 'Layer Style…',
+          run: () => openLayerStyles(layerStyleDeps),
+        },
+        {
+          label: 'Toggle Effects',
+          run: () => toggleLayerStyles(layerStyleDeps),
+        },
+        {
+          label: 'Clear Effects',
+          run: () => clearLayerStyles(layerStyleDeps),
+        },
         {
           label: 'Add Layer Mask',
           run: () => {

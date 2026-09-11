@@ -47,6 +47,7 @@ export function blendModeToComposite(mode: BlendMode): GlobalCompositeOperation 
 }
 
 import type { AdjustmentData } from './adjustments';
+import type { LayerStyles } from './layer-styles';
 import type { ShapeData } from './shape-layer';
 import type { TextLayerData } from './text-layer';
 
@@ -102,6 +103,14 @@ export interface Layer {
    * everything composited beneath them.
    */
   adjustment?: AdjustmentData;
+  /**
+   * Non-destructive effects. Immutable: an edit replaces the whole object, so
+   * a rendered result can be cached by identity and history can hold one by
+   * reference.
+   */
+  styles?: LayerStyles;
+  /** Effects stay attached but stop rendering when this is false. */
+  stylesEnabled?: boolean;
   /** The group this layer sits inside, if any. Groups can nest. */
   parentId?: string;
   /** Collapsed groups hide their children in the panel, not in the composite. */

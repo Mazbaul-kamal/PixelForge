@@ -67,6 +67,8 @@ export class LayersPanel {
   private maskViewId: string | null = null;
   onMaskViewChanged: ((layerId: string | null) => void) | null = null;
   private renderedOrder = '';
+  /** Set by the app: opens the effects editor for a layer. */
+  onEditStyles: (id: string) => void = () => {};
   private rowDepths = new Map<string, number>();
   private opacityTx: Transaction | null = null;
   private readonly detachers: Array<() => void> = [];
@@ -162,6 +164,11 @@ export class LayersPanel {
 
     this.detachers.push(history.subscribe(() => this.onHistoryChanged()));
     this.syncSelectionToDocument();
+    this.render();
+  }
+
+  /** Redraws the list, for changes the panel did not make itself. */
+  refresh(): void {
     this.render();
   }
 
@@ -466,6 +473,10 @@ export class LayersPanel {
               },
               onPick: (id, event) => this.pick(id, event),
               onRename: (id, name) => renameLayer(this.doc, this.history, id, name),
+              onEditStyles: (id) => {
+                this.pick(id, new MouseEvent('click'));
+                this.onEditStyles(id);
+              },
               onLoadSelection: (id) => {
                 selectLayerAlpha(this.doc, this.history, id);
                 this.onChanged();

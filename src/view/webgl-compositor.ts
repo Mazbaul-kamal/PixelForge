@@ -1,4 +1,5 @@
-import { hasActiveMask, surfaceFor } from '../core/compositor';
+import { hasActiveMask, styledLayerFor, surfaceFor } from '../core/compositor';
+import { hasBackdropStyles } from '../core/layer-styles';
 import type { LiveStroke } from '../core/compositor';
 import type { PixelDocument } from '../core/document';
 import { BLEND_MODES } from '../core/types';
@@ -256,6 +257,10 @@ export class WebGLCompositor {
       if (layer.type === 'group' || layer.type === 'adjustment') return false;
       if (layer.clipped === true) return false;
       if (layer.parentId !== undefined) return false;
+      // A drop shadow or outer glow has to blend with the document beneath
+      // the layer, which this path composites one quad at a time and cannot
+      // reach. Interior effects bake into the surface and are fine.
+      if (hasBackdropStyles(layer)) return false;
       if (layer.canvas.width > max || layer.canvas.height > max) return false;
     }
     return true;
@@ -369,8 +374,17 @@ export class WebGLCompositor {
       const painting = live !== null && live.layerId === layer.id;
       // surfaceFor folds the live stroke and the mask together, so a layer
       // being painted needs no separate mask pass.
-      const source = painting ? surfaceFor(layer, live) : layer.canvas;
-      const mask = !painting && hasActiveMask(layer) ? layer.mask ?? null : null;
+      const plain = painting ? surfaceFor(layer, live) : layer.canvas;
+
+      // Interior effects are baked into a padded surface that sits at its own
+      // origin, which the rect uniform handles without any special case. The
+      // effects are generated from the masked shape, so that surface has the
+      // mask in it already and the shader must not apply it a second time.
+      const styled = styledLayerFor(layer, painting ? plain : surfaceFor(layer));
+      const source = styled ? styled.surface.canvas : plain;
+      const originX = styled ? styled.surface.x : layer.x;
+      const originY = styled ? styled.surface.y : layer.y;
+      const mask = !painting && !styled && hasActiveMask(layer) ? layer.mask ?? null : null;
 
       let entry = this.cache.get(layer.id);
       if (!entry) {
@@ -415,7 +429,7 @@ export class WebGLCompositor {
       gl.uniform1i(uniforms.u_hasMask ?? null, entry.mask ? 1 : 0);
       gl.uniform1f(uniforms.u_opacity ?? null, Math.min(1, Math.max(0, layer.opacity)));
       gl.uniform1i(uniforms.u_mode ?? null, Math.max(0, BLEND_MODES.indexOf(layer.blendMode)));
-      this.setRect(uniforms.u_layerRect ?? null, layer.x, layer.y, source.width, source.height);
+      this.setRect(uniforms.u_layerRect ?? null, originX, originY, source.width, source.height);
       if (mask) this.setRect(uniforms.u_maskRect ?? null, layer.x, layer.y, mask.width, mask.height);
       else this.setRect(uniforms.u_maskRect ?? null, 0, 0, this.width, this.height);
 

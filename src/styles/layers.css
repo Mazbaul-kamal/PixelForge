@@ -291,3 +291,19 @@
 .pf-layer-disclosure:hover {
   color: var(--pf-text);
 }
+
+.pf-layer-fx {
+  margin-left: 6px;
+  padding: 0 3px;
+  border-radius: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--pf-accent);
+  cursor: pointer;
+}
+
+.pf-layer-fx.is-off {
+  color: var(--pf-text-dim);
+  text-decoration: line-through;
+}
