@@ -186,7 +186,12 @@ export function openParameterDialog(options: ParameterDialogOptions): {
     if (!committed) options.onCancel();
   });
 
-  notify();
+  // The first preview is deferred by a microtask rather than run here.
+  // Callers write `const dialog = openParameterDialog({ onPreview: () =>
+  // dialog.setBusy(...) })`, so calling back synchronously would touch that
+  // binding before it exists — and because the throw escaped from inside this
+  // function, the assignment never happened and every later handler threw too.
+  queueMicrotask(notify);
 
   return {
     setBusy: (isBusy, label) => {

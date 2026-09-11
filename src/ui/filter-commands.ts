@@ -30,6 +30,21 @@ function controlsFor(kind: FilterKind): ParameterControl[] {
     case 'median': return [slider('radius', 'Radius', 1, 8, 'px')];
     case 'pixelate': return [slider('size', 'Cell size', 2, 120, 'px')];
     case 'high-pass': return [slider('radius', 'Radius', 0.5, 60, 'px', 0.5)];
+    case 'emboss': return [
+      slider('angle', 'Angle', -180, 180, '°'), slider('depth', 'Depth', 1, 20, 'px'),
+      slider('amount', 'Amount', 10, 500, '%'),
+    ];
+    case 'find-edges': return [];
+    case 'surface-blur': return [
+      slider('radius', 'Radius', 1, 20, 'px'), slider('threshold', 'Threshold', 2, 100),
+    ];
+    case 'twirl': return [
+      slider('angle', 'Angle', -720, 720, '°'), slider('radius', 'Radius', 5, 100, '%'),
+    ];
+    case 'vignette': return [
+      slider('amount', 'Amount', -100, 100, '%'), slider('midpoint', 'Midpoint', 5, 95, '%'),
+      slider('roundness', 'Roundness', 0, 100, '%'),
+    ];
   }
 }
 
@@ -163,4 +178,5 @@ export function openFilter(deps: FilterDeps, kind: FilterKind): void {
 export const FILTER_KINDS: readonly FilterKind[] = [
   'gaussian-blur', 'motion-blur', 'sharpen', 'unsharp-mask',
   'add-noise', 'median', 'pixelate', 'high-pass',
+  'emboss', 'find-edges', 'surface-blur', 'twirl', 'vignette',
 ];

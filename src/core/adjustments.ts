@@ -1,7 +1,9 @@
+import { hexToRgb } from './colour-utils';
 export type AdjustmentKind =
   | 'brightness-contrast' | 'levels' | 'curves' | 'hue-saturation' | 'colour-balance'
   | 'black-white' | 'exposure' | 'vibrance' | 'photo-filter'
-  | 'invert' | 'threshold' | 'posterize';
+  | 'invert' | 'threshold' | 'posterize'
+  | 'gradient-map' | 'selective-colour' | 'channel-mixer';
 
 export type CurvePoint = readonly [number, number];
 
@@ -230,6 +232,98 @@ export function createAdjustment(adjustment: AdjustmentData): AdjustmentOperator
       } };
     }
 
+    case 'gradient-map': {
+      const shadow = hexToRgb(text(params, 'shadow', '#000000')) ?? { r: 0, g: 0, b: 0 };
+      const highlight = hexToRgb(text(params, 'highlight', '#ffffff')) ?? { r: 255, g: 255, b: 255 };
+      const midpoint = Math.min(0.95, Math.max(0.05, num(params, 'midpoint', 0.5)));
+      const reverse = params.reverse === true;
+
+      // One ramp per channel, indexed by luminance, so the whole thing is
+      // three lookups and no arithmetic per pixel.
+      const ramp = [0, 1, 2].map((channel) => {
+        const from = channel === 0 ? shadow.r : channel === 1 ? shadow.g : shadow.b;
+        const to = channel === 0 ? highlight.r : channel === 1 ? highlight.g : highlight.b;
+        return buildLut((i) => {
+          let t = i / 255;
+          if (reverse) t = 1 - t;
+          // The midpoint bends the ramp the way a gradient midpoint does.
+          const shaped = Math.pow(t, Math.log(0.5) / Math.log(midpoint));
+          return from + (to - from) * shaped;
+        });
+      });
+
+      return { apply: (data) => {
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] === 0) continue;
+          const luma = Math.round(
+            0.2126 * data[i]! + 0.7152 * data[i + 1]! + 0.0722 * data[i + 2]!,
+          );
+          data[i] = ramp[0]![luma]!;
+          data[i + 1] = ramp[1]![luma]!;
+          data[i + 2] = ramp[2]![luma]!;
+        }
+      } };
+    }
+
+    case 'channel-mixer': {
+      const output = text(params, 'output', 'red');
+      const mono = params.monochrome === true;
+      const wr = num(params, 'red', output === 'red' ? 100 : 0) / 100;
+      const wg = num(params, 'green', output === 'green' ? 100 : 0) / 100;
+      const wb = num(params, 'blue', output === 'blue' ? 100 : 0) / 100;
+      const constant = (num(params, 'constant', 0) / 100) * 255;
+
+      return { apply: (data) => {
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] === 0) continue;
+          const mixed = data[i]! * wr + data[i + 1]! * wg + data[i + 2]! * wb + constant;
+          if (mono) {
+            const value = clamp255(mixed);
+            data[i] = value; data[i + 1] = value; data[i + 2] = value;
+          } else if (output === 'red') {
+            data[i] = clamp255(mixed);
+          } else if (output === 'green') {
+            data[i + 1] = clamp255(mixed);
+          } else {
+            data[i + 2] = clamp255(mixed);
+          }
+        }
+      } };
+    }
+
+    case 'selective-colour': {
+      const range = text(params, 'range', 'reds');
+      const relative = params.relative !== false;
+      const cyan = num(params, 'cyan', 0) / 100;
+      const magenta = num(params, 'magenta', 0) / 100;
+      const yellow = num(params, 'yellow', 0) / 100;
+      const black = num(params, 'black', 0) / 100;
+
+      return { apply: (data) => {
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] === 0) continue;
+          const r = data[i]! / 255;
+          const g = data[i + 1]! / 255;
+          const b = data[i + 2]! / 255;
+          const weight = selectiveWeight(range, r, g, b);
+          if (weight <= 0) continue;
+
+          // Photoshop works in CMY here: more cyan means less red.
+          const channels = [r, g, b];
+          const deltas = [-cyan, -magenta, -yellow];
+          for (let c = 0; c < 3; c += 1) {
+            const value = channels[c]!;
+            let next = relative
+              ? value + value * deltas[c]! * weight
+              : value + deltas[c]! * weight;
+            // Black moves every channel toward zero together.
+            next = relative ? next - next * black * weight : next - black * weight;
+            data[i + c] = clamp255(next * 255);
+          }
+        }
+      } };
+    }
+
     case 'posterize': {
       const levels = Math.max(2, Math.round(num(params, 'levels', 6)));
       const step = 255 / (levels - 1);
@@ -386,6 +480,45 @@ export function defaultParams(kind: AdjustmentKind): AdjustmentParams {
     case 'invert': return {};
     case 'threshold': return { level: 128 };
     case 'posterize': return { levels: 6 };
+    case 'gradient-map': return {
+      shadow: '#1b2a4a', highlight: '#ffd9a0', midpoint: 0.5, reverse: false,
+    };
+    case 'channel-mixer': return {
+      output: 'red', red: 100, green: 0, blue: 0, constant: 0, monochrome: false,
+    };
+    case 'selective-colour': return {
+      range: 'reds', cyan: 0, magenta: 0, yellow: 0, black: 0, relative: true,
+    };
+  }
+}
+
+/**
+ * How strongly a colour belongs to one of Photoshop's nine ranges.
+ *
+ * The six hue ranges use the standard trick: a pixel's membership is how much
+ * its channels separate, so a pure red scores 1 and a grey scores 0. Whites,
+ * neutrals and blacks are keyed off lightness instead.
+ */
+function selectiveWeight(range: string, r: number, g: number, b: number): number {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const mid = r + g + b - max - min;
+
+  switch (range) {
+    case 'reds': return r === max ? Math.max(0, r - Math.max(g, b)) : 0;
+    case 'greens': return g === max ? Math.max(0, g - Math.max(r, b)) : 0;
+    case 'blues': return b === max ? Math.max(0, b - Math.max(r, g)) : 0;
+    case 'cyans': return r === min ? Math.max(0, Math.min(g, b) - r) : 0;
+    case 'magentas': return g === min ? Math.max(0, Math.min(r, b) - g) : 0;
+    case 'yellows': return b === min ? Math.max(0, Math.min(r, g) - b) : 0;
+    case 'whites': return Math.max(0, (min - 0.5) * 2);
+    case 'blacks': return Math.max(0, (0.5 - max) * 2);
+    case 'neutrals': {
+      // Strongest for mid greys, fading out toward black, white and saturation.
+      const chroma = max - min;
+      return Math.max(0, (1 - chroma * 2)) * Math.max(0, 1 - Math.abs(mid - 0.5) * 2);
+    }
+    default: return 0;
   }
 }
 
@@ -402,6 +535,9 @@ export const ADJUSTMENT_NAMES: Record<AdjustmentKind, string> = {
   invert: 'Invert',
   threshold: 'Threshold',
   posterize: 'Posterize',
+  'gradient-map': 'Gradient Map',
+  'selective-colour': 'Selective Colour',
+  'channel-mixer': 'Channel Mixer',
 };
 
 /** Counts of each level, for the Levels histogram. */

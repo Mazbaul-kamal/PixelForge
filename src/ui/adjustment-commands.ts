@@ -22,6 +22,46 @@ function controlsFor(kind: AdjustmentKind): ParameterControl[] {
   switch (kind) {
     case 'brightness-contrast':
       return [slider('brightness', 'Brightness', -150, 150), slider('contrast', 'Contrast', -100, 100)];
+    case 'gradient-map':
+      return [
+        { kind: 'colour', id: 'shadow', label: 'Shadows' },
+        { kind: 'colour', id: 'highlight', label: 'Highlights' },
+        slider('midpoint', 'Midpoint', 0.05, 0.95, '', 0.01),
+        { kind: 'checkbox', id: 'reverse', label: 'Reverse' },
+      ];
+    case 'channel-mixer':
+      return [
+        {
+          kind: 'select', id: 'output', label: 'Output',
+          choices: [
+            { value: 'red', label: 'Red' }, { value: 'green', label: 'Green' },
+            { value: 'blue', label: 'Blue' },
+          ],
+        },
+        slider('red', 'Red source', -200, 200, '%'),
+        slider('green', 'Green source', -200, 200, '%'),
+        slider('blue', 'Blue source', -200, 200, '%'),
+        slider('constant', 'Constant', -100, 100, '%'),
+        { kind: 'checkbox', id: 'monochrome', label: 'Monochrome' },
+      ];
+    case 'selective-colour':
+      return [
+        {
+          kind: 'select', id: 'range', label: 'Colours',
+          choices: [
+            { value: 'reds', label: 'Reds' }, { value: 'yellows', label: 'Yellows' },
+            { value: 'greens', label: 'Greens' }, { value: 'cyans', label: 'Cyans' },
+            { value: 'blues', label: 'Blues' }, { value: 'magentas', label: 'Magentas' },
+            { value: 'whites', label: 'Whites' }, { value: 'neutrals', label: 'Neutrals' },
+            { value: 'blacks', label: 'Blacks' },
+          ],
+        },
+        slider('cyan', 'Cyan', -100, 100, '%'),
+        slider('magenta', 'Magenta', -100, 100, '%'),
+        slider('yellow', 'Yellow', -100, 100, '%'),
+        slider('black', 'Black', -100, 100, '%'),
+        { kind: 'checkbox', id: 'relative', label: 'Relative' },
+      ];
     case 'levels':
       return [
         slider('black', 'Black point', 0, 254),
@@ -176,4 +216,5 @@ export const ADJUSTMENT_KINDS: readonly AdjustmentKind[] = [
   'brightness-contrast', 'levels', 'curves', 'exposure', 'vibrance',
   'hue-saturation', 'colour-balance', 'black-white', 'photo-filter',
   'invert', 'threshold', 'posterize',
+  'gradient-map', 'selective-colour', 'channel-mixer',
 ];
