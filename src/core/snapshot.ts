@@ -2,6 +2,7 @@ import type { PixelDocument } from './document';
 import type { SelectionMask } from './selection';
 import type { AdjustmentData } from './adjustments';
 import type { LayerStyles } from './layer-styles';
+import type { VectorPath } from './path';
 import type { ShapeData } from './shape-layer';
 import type { TextLayerData } from './text-layer';
 import type { BlendMode, Layer, LayerType } from './types';
@@ -59,6 +60,10 @@ export interface DocumentSnapshot {
   /** Selection masks are treated as immutable, so a reference is enough. */
   readonly selection: SelectionMask | null;
   readonly layers: readonly LayerRecord[];
+  /** Paths are immutable, so references are enough. */
+  readonly paths: readonly VectorPath[];
+  readonly activePathId: string | null;
+  readonly workPathId: string | null;
 }
 
 function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -133,6 +138,9 @@ export function captureDocument(doc: PixelDocument): DocumentSnapshot {
       parentId: layer.parentId,
       collapsed: layer.collapsed === true,
     })),
+    paths: [...doc.paths],
+    activePathId: doc.activePathId,
+    workPathId: doc.workPathId,
   };
 }
 
@@ -148,6 +156,9 @@ export function restoreDocument(doc: PixelDocument, snapshot: DocumentSnapshot):
   doc.layers.push(...restored);
   doc.activeLayerId = snapshot.activeLayerId;
   doc.selection = snapshot.selection;
+  doc.paths = [...snapshot.paths];
+  doc.activePathId = snapshot.activePathId;
+  doc.workPathId = snapshot.workPathId;
 }
 
 function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
@@ -223,9 +234,16 @@ export function documentSnapshotsEqual(a: DocumentSnapshot, b: DocumentSnapshot)
     a.height !== b.height ||
     a.activeLayerId !== b.activeLayerId ||
     a.selection !== b.selection ||
+    a.activePathId !== b.activePathId ||
+    a.workPathId !== b.workPathId ||
+    a.paths.length !== b.paths.length ||
     a.layers.length !== b.layers.length
   ) {
     return false;
+  }
+
+  for (let i = 0; i < a.paths.length; i++) {
+    if (a.paths[i] !== b.paths[i]) return false;
   }
 
   for (let i = 0; i < a.layers.length; i++) {

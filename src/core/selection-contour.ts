@@ -14,6 +14,25 @@ type Corner = number;
  * holes and separate islands included — rather than a bounding box.
  */
 export function traceSelectionOutline(mask: SelectionMask): Path2D {
+  const path = new Path2D();
+  for (const loop of traceSelectionLoops(mask)) {
+    const first = loop[0];
+    if (!first) continue;
+    path.moveTo(first[0], first[1]);
+    for (let i = 1; i < loop.length; i++) path.lineTo(loop[i]![0], loop[i]![1]);
+    path.closePath();
+  }
+  return path;
+}
+
+/**
+ * The same boundary, as loops of document-space points.
+ *
+ * Kept separate from the Path2D version because turning a selection into an
+ * editable path needs the points themselves, and tracing the mask twice with
+ * two slightly different walkers would be two places for the rules to drift.
+ */
+export function traceSelectionLoops(mask: SelectionMask): Array<Array<[number, number]>> {
   const { width, height, data } = mask;
   /** Corners form a (width+1) x (height+1) lattice. */
   const stride = width + 1;
@@ -41,14 +60,14 @@ export function traceSelectionOutline(mask: SelectionMask): Path2D {
     }
   }
 
-  const path = new Path2D();
+  const loops: Array<Array<[number, number]>> = [];
   for (const start of [...outgoing.keys()]) {
     while ((outgoing.get(start)?.length ?? 0) > 0) {
       const loop = walkLoop(outgoing, start);
-      if (loop.length > 2) emitLoop(path, loop, stride);
+      if (loop.length > 2) loops.push(simplifyLoop(loop, stride));
     }
   }
-  return path;
+  return loops;
 }
 
 /** Follows edges from `start` until the loop closes, consuming them. */
@@ -70,8 +89,8 @@ function walkLoop(outgoing: Map<Corner, Corner[]>, start: Corner): Corner[] {
   return loop;
 }
 
-/** Writes a loop into the path, dropping points that sit on a straight run. */
-function emitLoop(path: Path2D, loop: readonly Corner[], stride: number): void {
+/** Turns a loop of corner keys into points, dropping straight-run middles. */
+function simplifyLoop(loop: readonly Corner[], stride: number): Array<[number, number]> {
   const points = loop.map((key): [number, number] => [key % stride, Math.floor(key / stride)]);
   const kept: [number, number][] = [];
 
@@ -86,11 +105,5 @@ function emitLoop(path: Path2D, loop: readonly Corner[], stride: number): void {
     if (!collinear) kept.push(current);
   }
 
-  const outline = kept.length > 2 ? kept : points;
-  const first = outline[0];
-  if (!first) return;
-
-  path.moveTo(first[0], first[1]);
-  for (let i = 1; i < outline.length; i++) path.lineTo(outline[i]![0], outline[i]![1]);
-  path.closePath();
+  return kept.length > 2 ? kept : points;
 }

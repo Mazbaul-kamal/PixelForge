@@ -40,6 +40,7 @@ import { createCloneStampTool } from './tools/clone-stamp-tool';
 import { createDodgeBurnTool } from './tools/dodge-burn-tool';
 import { createSmudgeTool } from './tools/smudge-tool';
 import { createTransformTool } from './tools/transform-tool';
+import { createPenTool } from './tools/pen-tool';
 import { createShapeTool } from './tools/shape-tool';
 import { createSpotHealingTool } from './tools/spot-healing-tool';
 import { createTextTool } from './tools/text-tool';
@@ -81,6 +82,7 @@ import { attachViewShortcuts } from './ui/view-shortcuts';
 import { UnsavedGuard } from './ui/unsaved-guard';
 import { attachLayerShortcuts } from './ui/layer-shortcuts';
 import { HistoryPanel } from './ui/panels/history-panel';
+import { PathsPanel } from './ui/panels/paths-panel';
 import { InfoPanel } from './ui/panels/info-panel';
 import { LayersPanel } from './ui/panels/layers-panel';
 import { attachHistoryShortcuts } from './ui/shortcuts';
@@ -141,7 +143,19 @@ function boot(): void {
   const layersPanel = new LayersPanel(doc, history, thumbnails, documentChanged);
   const historyPanel = new HistoryPanel(history);
   const infoPanel = new InfoPanel((message) => notices.show(message));
-  shell.panels.append(layersPanel.root, infoPanel.root, historyPanel.root);
+  const pathsPanel = new PathsPanel({
+    doc,
+    history,
+    changed: () => {
+      thumbnails.markAllDirty();
+      compositor.markDirty();
+      documentChanged();
+    },
+    notify: (message, detail) => notices.show(message, detail),
+    colour: () => colours.foreground,
+    strokeWidth: () => 2,
+  });
+  shell.panels.append(layersPanel.root, pathsPanel.root, infoPanel.root, historyPanel.root);
 
   layersPanel.onMaskViewChanged = (layerId) => {
     compositor.setMaskPreview(layerId);
@@ -398,6 +412,15 @@ function boot(): void {
     createShapeTool({
       onChanged: () => {
         thumbnails.markAllDirty();
+        documentChanged();
+      },
+    }),
+  );
+
+  toolManager.register(
+    createPenTool({
+      onChanged: () => {
+        pathsPanel.render();
         documentChanged();
       },
     }),

@@ -176,3 +176,64 @@
   font-size: 11px;
   line-height: 1.7;
 }
+
+.pf-path-list {
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.pf-path-empty {
+  margin: 6px 8px 10px;
+  color: var(--pf-text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.pf-path-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 9px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.pf-path-row:hover { background: rgba(255, 255, 255, 0.04); }
+
+.pf-path-row.is-active {
+  background: rgba(76, 159, 254, 0.18);
+  border-left-color: var(--pf-accent);
+}
+
+.pf-path-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-path-row.is-work .pf-path-name { font-style: italic; }
+
+.pf-path-count {
+  flex: 0 0 auto;
+  color: var(--pf-text-dim);
+  font-size: 10px;
+}
+
+.pf-path-rename {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid var(--pf-accent);
+  border-radius: 2px;
+  background: var(--pf-bg-sunken);
+  color: var(--pf-text);
+  font: inherit;
+}
+
+.pf-path-actions {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  border-top: 1px solid var(--pf-line);
+}

@@ -54,7 +54,11 @@ const SMUDGE_ICON =
 const TRANSFORM_ICON =
   '<rect x="4" y="4" width="12" height="12" stroke-dasharray="3 2"/><rect x="2" y="2" width="4" height="4"/><rect x="14" y="14" width="4" height="4"/>';
 
+const PEN_ICON =
+  '<path d="M4 16.5 5.6 12 13 4.6a1.7 1.7 0 0 1 2.4 2.4L8 14.4Z"/><path d="M11.6 6 14 8.4"/>';
+
 const ICONS: Record<string, string> = {
+  pen: PEN_ICON,
   transform: TRANSFORM_ICON,
   dodge: DODGE_ICON,
   burn: BURN_ICON,

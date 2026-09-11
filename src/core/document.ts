@@ -1,3 +1,4 @@
+import type { VectorPath } from './path';
 import type { SelectionMask } from './selection';
 import type { Layer } from './types';
 
@@ -12,6 +13,14 @@ export class PixelDocument {
   activeLayerId: string | null = null;
   /** Owned by the selection engine in a later step. */
   selection: SelectionMask | null = null;
+  /**
+   * Saved Bézier paths. The pen tool draws into the work path — the one whose
+   * id matches workPathId — until it is given a name, which is how Photoshop
+   * behaves and keeps an experiment from cluttering the list.
+   */
+  paths: VectorPath[] = [];
+  activePathId: string | null = null;
+  workPathId: string | null = null;
   /** Used for the export filename and the window title. */
   name = 'Untitled';
   /**
@@ -73,6 +82,30 @@ export class PixelDocument {
     return this.layers.find((layer) => layer.id === id) ?? null;
   }
 
+  getPath(id: string | null): VectorPath | null {
+    if (!id) return null;
+    return this.paths.find((path) => path.id === id) ?? null;
+  }
+
+  getActivePath(): VectorPath | null {
+    return this.getPath(this.activePathId);
+  }
+
+  /** Replaces a path in place, keeping its position in the list. */
+  setPath(path: VectorPath): void {
+    const index = this.paths.findIndex((existing) => existing.id === path.id);
+    if (index >= 0) this.paths[index] = path;
+    else this.paths.push(path);
+  }
+
+  removePath(id: string): void {
+    const index = this.paths.findIndex((path) => path.id === id);
+    if (index < 0) return;
+    this.paths.splice(index, 1);
+    if (this.activePathId === id) this.activePathId = null;
+    if (this.workPathId === id) this.workPathId = null;
+  }
+
   indexOfLayer(id: string): number {
     return this.layers.findIndex((layer) => layer.id === id);
   }
@@ -82,3 +115,4 @@ function clampIndex(value: number, max: number): number {
   if (!Number.isFinite(value)) return max;
   return Math.min(Math.max(Math.round(value), 0), max);
 }
+

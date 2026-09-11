@@ -3,6 +3,7 @@ import type { PixelDocument } from './document';
 import { createLayer } from './layer';
 import { SelectionMask } from './selection';
 import type { LayerStyles } from './layer-styles';
+import type { VectorPath } from './path';
 import type { ShapeData } from './shape-layer';
 import type { TextLayerData } from './text-layer';
 import type { BlendMode, Layer, LayerType } from './types';
@@ -48,6 +49,9 @@ export interface StoredDocument {
   readonly layers: readonly StoredLayer[];
   readonly selectionKey?: string;
   readonly viewport: { readonly zoom: number; readonly panX: number; readonly panY: number };
+  readonly paths?: readonly VectorPath[];
+  readonly activePathId?: string | null;
+  readonly workPathId?: string | null;
 }
 
 export interface SerialisedProject {
@@ -146,6 +150,9 @@ export async function serialiseProject(
       activeLayerId: doc.activeLayerId,
       layers,
       ...(selectionKey ? { selectionKey } : {}),
+      ...(doc.paths.length > 0
+        ? { paths: doc.paths, activePathId: doc.activePathId, workPathId: doc.workPathId }
+        : {}),
       viewport: { ...options.viewport },
     },
     blobs,
@@ -221,6 +228,16 @@ export async function restoreProject(
   doc.activeLayerId = null;
   for (const layer of rebuilt) doc.addLayer(layer);
   if (stored.activeLayerId) doc.setActiveLayer(stored.activeLayerId);
+
+  doc.paths = stored.paths ? stored.paths.map((path) => ({
+    ...path,
+    subpaths: path.subpaths.map((sub) => ({
+      closed: sub.closed,
+      anchors: sub.anchors.map((anchor) => ({ ...anchor })),
+    })),
+  })) : [];
+  doc.activePathId = stored.activePathId ?? null;
+  doc.workPathId = stored.workPathId ?? null;
 
   doc.selection = null;
   const selectionBlob = stored.selectionKey ? blobs.get(stored.selectionKey) : undefined;
