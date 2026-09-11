@@ -55,6 +55,31 @@ export function isCorner(anchor: PathAnchor): boolean {
     && anchor.outX === anchor.x && anchor.outY === anchor.y;
 }
 
+/**
+ * True when the two handles are opposite and collinear through the anchor, so
+ * the curve passes through without a kink.
+ *
+ * This is a different question from isCorner: a point where two curves meet at
+ * an angle has two long handles that are not collinear, which is a corner even
+ * though neither handle sits on the anchor. Curve fitting produces exactly
+ * that, so anything drawing or counting corners needs this rather than a test
+ * for zero-length handles.
+ */
+export function isSmooth(anchor: PathAnchor): boolean {
+  const inX = anchor.inX - anchor.x;
+  const inY = anchor.inY - anchor.y;
+  const outX = anchor.outX - anchor.x;
+  const outY = anchor.outY - anchor.y;
+
+  const inLength = Math.hypot(inX, inY);
+  const outLength = Math.hypot(outX, outY);
+  if (inLength < 1e-6 || outLength < 1e-6) return false;
+
+  // Opposite directions give a dot product of -1 once normalised.
+  const alignment = (inX * outX + inY * outY) / (inLength * outLength);
+  return alignment < -0.985;
+}
+
 /** Moves an anchor and its handles together. */
 export function moveAnchor(anchor: PathAnchor, dx: number, dy: number): PathAnchor {
   return {

@@ -29,7 +29,7 @@ export class PsdRunner {
       const gigabytes = (file.size / 1_000_000_000).toFixed(2);
       return {
         id, width: 0, height: 0, colourMode: 3, bitsPerChannel: 8,
-        layers: [], composite: undefined,
+        layers: [], composite: undefined, xmp: undefined, guides: [],
         error:
           `“${file.name}” is ${gigabytes} GB, which is larger than this browser tab can hold. ` +
           'Try flattening it or splitting it up in the application that made it.',
@@ -41,7 +41,7 @@ export class PsdRunner {
     if (!worker) {
       return {
         id, width: 0, height: 0, colourMode: 3, bitsPerChannel: 8,
-        layers: [], composite: undefined,
+        layers: [], composite: undefined, xmp: undefined, guides: [],
         error: 'This browser cannot run the background worker needed to read PSD files.',
       };
     }

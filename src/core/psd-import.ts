@@ -5,6 +5,9 @@ import { blendModeFromPsd } from './psd-blend-modes';
 import type { PsdLayerData, PsdParseResult } from './psd-worker';
 import { DEFAULT_TEXT_STYLE } from './text-layer';
 import type { Layer } from './types';
+import { psdEffectsToStyles } from './psd-effects';
+import type { PsdEffects } from './psd-effects';
+import { decodeSidecar } from './psd-metadata';
 
 /** Colour modes ag-psd reports, by their PSD numbers. */
 const COLOUR_MODE_NAMES: Record<number, string> = {
@@ -73,6 +76,10 @@ export function importPsd(
   }
 
   const built: Layer[] = [];
+  // PixelForge's own state, when this file was written here. It wins over the
+  // PSD effects below, because our model has settings PSD cannot express.
+  const sidecar = decodeSidecar(parsed.xmp);
+  let written = 0;
 
   const walk = (entries: readonly PsdLayerData[], parentId: string | undefined): void => {
     for (const entry of entries) {
@@ -116,6 +123,20 @@ export function importPsd(
         layer.maskLinked = true;
       }
 
+      const exact = sidecar?.styles[String(written)];
+      written += 1;
+      if (exact) {
+        layer.styles = exact;
+        layer.stylesEnabled = true;
+      } else if (entry.effects) {
+        const effects = entry.effects as PsdEffects;
+        const mapped = psdEffectsToStyles(effects);
+        if (mapped) {
+          layer.styles = mapped;
+          layer.stylesEnabled = effects.disabled !== true;
+        }
+      }
+
       built.push(layer);
       layerCount++;
 
@@ -152,6 +173,31 @@ export function importPsd(
     doc.activeLayerId = null;
     doc.selection = null;
     doc.name = name;
+
+    // Paths come only from the sidecar: ag-psd does not implement the image
+    // resource that holds a PSD's named paths.
+    doc.paths = (sidecar?.paths ?? []).map((path) => ({
+      ...path,
+      subpaths: path.subpaths.map((sub) => ({
+        closed: sub.closed,
+        anchors: sub.anchors.map((anchor) => ({ ...anchor })),
+      })),
+    }));
+    doc.activePathId = sidecar?.activePathId ?? null;
+    doc.workPathId = null;
+
+    // Guides have a real PSD home, so a file from anywhere brings them.
+    doc.guides = sidecar
+      ? sidecar.guides.map((guide) => ({ ...guide }))
+      : parsed.guides
+        .map((guide) => ({
+          axis: guide.direction === 'vertical' ? ('x' as const) : ('y' as const),
+          position: Math.round(guide.location),
+        }))
+        .filter((guide) => guide.position >= 0
+          && guide.position <= (guide.axis === 'x' ? parsed.width : parsed.height));
+
+    doc.channels = [];
 
     for (const layer of built) doc.addLayer(layer);
     const top = built[built.length - 1];

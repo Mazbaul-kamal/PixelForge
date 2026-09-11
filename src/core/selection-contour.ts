@@ -32,7 +32,10 @@ export function traceSelectionOutline(mask: SelectionMask): Path2D {
  * editable path needs the points themselves, and tracing the mask twice with
  * two slightly different walkers would be two places for the rules to drift.
  */
-export function traceSelectionLoops(mask: SelectionMask): Array<Array<[number, number]>> {
+export function traceSelectionLoops(
+  mask: SelectionMask,
+  simplify = true,
+): Array<Array<[number, number]>> {
   const { width, height, data } = mask;
   /** Corners form a (width+1) x (height+1) lattice. */
   const stride = width + 1;
@@ -64,7 +67,9 @@ export function traceSelectionLoops(mask: SelectionMask): Array<Array<[number, n
   for (const start of [...outgoing.keys()]) {
     while ((outgoing.get(start)?.length ?? 0) > 0) {
       const loop = walkLoop(outgoing, start);
-      if (loop.length > 2) loops.push(simplifyLoop(loop, stride));
+      if (loop.length > 2) {
+        loops.push(simplify ? simplifyLoop(loop, stride) : expandLoop(loop, stride));
+      }
     }
   }
   return loops;
@@ -87,6 +92,11 @@ function walkLoop(outgoing: Map<Corner, Corner[]>, start: Corner): Corner[] {
     if (current === start) break;
   }
   return loop;
+}
+
+/** Every corner on the loop, for callers that need the full boundary. */
+function expandLoop(loop: readonly Corner[], stride: number): Array<[number, number]> {
+  return loop.map((key): [number, number] => [key % stride, Math.floor(key / stride)]);
 }
 
 /** Turns a loop of corner keys into points, dropping straight-run middles. */

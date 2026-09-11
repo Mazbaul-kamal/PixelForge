@@ -15,6 +15,8 @@ export interface PsdLayerData {
   readonly maskData: ImageData | undefined;
   readonly maskLeft: number;
   readonly maskTop: number;
+  /** Plain JSON, so it crosses the worker boundary unchanged. */
+  readonly effects: unknown;
   readonly children: PsdLayerData[];
 }
 
@@ -26,6 +28,9 @@ export interface PsdParseResult {
   readonly bitsPerChannel: number;
   readonly layers: PsdLayerData[];
   readonly composite: ImageData | undefined;
+  /** PixelForge's own state, when this file was written here. */
+  readonly xmp: string | undefined;
+  readonly guides: readonly { location: number; direction: string }[];
   readonly error?: string;
 }
 
@@ -43,6 +48,7 @@ interface RawLayer {
   imageData?: ImageData;
   text?: { text?: string };
   mask?: { imageData?: ImageData; left?: number; top?: number };
+  effects?: unknown;
 }
 
 function convertLayer(layer: RawLayer): PsdLayerData {
@@ -62,6 +68,7 @@ function convertLayer(layer: RawLayer): PsdLayerData {
     maskData: layer.mask?.imageData,
     maskLeft: layer.mask?.left ?? 0,
     maskTop: layer.mask?.top ?? 0,
+    effects: layer.effects,
     children: children.map(convertLayer),
   };
 }
@@ -87,6 +94,12 @@ self.addEventListener('message', (event: MessageEvent<{ id: number; buffer: Arra
     }) as unknown as {
       width: number; height: number; colorMode?: number; bitsPerChannel?: number;
       children?: RawLayer[]; imageData?: ImageData;
+      imageResources?: {
+        xmpMetadata?: string;
+        gridAndGuidesInformation?: {
+          guides?: { location: number; direction: string }[];
+        };
+      };
     };
 
     const layers = (psd.children ?? []).map(convertLayer);
@@ -98,6 +111,8 @@ self.addEventListener('message', (event: MessageEvent<{ id: number; buffer: Arra
       bitsPerChannel: psd.bitsPerChannel ?? 8,
       layers,
       composite: psd.imageData,
+      xmp: psd.imageResources?.xmpMetadata,
+      guides: psd.imageResources?.gridAndGuidesInformation?.guides ?? [],
     };
 
     const transfers: ArrayBuffer[] = [];
@@ -109,7 +124,7 @@ self.addEventListener('message', (event: MessageEvent<{ id: number; buffer: Arra
     const message = error instanceof Error ? error.message : 'The file could not be read.';
     (self as unknown as Worker).postMessage({
       id, width: 0, height: 0, colourMode: 3, bitsPerChannel: 8,
-      layers: [], composite: undefined, error: message,
+      layers: [], composite: undefined, xmp: undefined, guides: [], error: message,
     } satisfies PsdParseResult);
   }
 });

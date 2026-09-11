@@ -1,6 +1,7 @@
 import {
   anchorCount, createAnchor, emptyPath, hitAnchor, hitSegment, insertAnchor, isCorner,
-  moveAnchor, pathToPath2D, removeAnchor, replaceAnchor, setSmoothHandles, toCorner, toSmooth,
+  isSmooth, moveAnchor, pathToPath2D, removeAnchor, replaceAnchor, setSmoothHandles,
+  toCorner, toSmooth,
 } from '../core/path';
 import type { AnchorHit, PathAnchor, VectorPath } from '../core/path';
 import type { Point } from '../core/types';
@@ -393,10 +394,12 @@ export function createPenTool(deps: PenDeps): Tool {
           const size = ANCHOR_SIZE;
 
           ctx.beginPath();
-          if (isCorner(anchor)) {
-            ctx.rect(at.x - size / 2, at.y - size / 2, size, size);
-          } else {
+          // A square means the curve kinks here, which covers both a plain
+          // corner and a fitted one whose handles simply are not collinear.
+          if (isSmooth(anchor)) {
             ctx.arc(at.x, at.y, size / 2, 0, Math.PI * 2);
+          } else {
+            ctx.rect(at.x - size / 2, at.y - size / 2, size, size);
           }
           ctx.fillStyle = active ? '#4c9ffe' : '#ffffff';
           ctx.fill();
