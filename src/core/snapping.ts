@@ -1,4 +1,6 @@
 import type { PixelDocument } from './document';
+import { gridLines } from './guides';
+import type { GuideSettings } from './guides';
 import type { Layer, Rect } from './types';
 
 export type Axis = 'x' | 'y';
@@ -53,6 +55,39 @@ function pushTargets(out: SnapTarget[], rect: Rect, axis: Axis): void {
  * Everything the moving layer can align to: the document edges and centre,
  * and the edges and centres of the other visible layers.
  */
+/**
+ * Ruler guides and grid lines as snap targets.
+ *
+ * They span the whole document rather than a layer's extent, so the alignment
+ * line the move tool draws runs the full width or height — which is what makes
+ * it read as "you are on the guide" rather than "you are next to something".
+ */
+export function guideSnapTargets(
+  doc: PixelDocument, settings: GuideSettings,
+): SnapTarget[] {
+  const targets: SnapTarget[] = [];
+  if (!settings.snap) return targets;
+
+  if (settings.guides) {
+    for (const guide of doc.guides) {
+      targets.push(guide.axis === 'x'
+        ? { axis: 'x', position: guide.position, from: 0, to: doc.height }
+        : { axis: 'y', position: guide.position, from: 0, to: doc.width });
+    }
+  }
+
+  if (settings.grid) {
+    for (const at of gridLines(settings, doc.width).major) {
+      targets.push({ axis: 'x', position: at, from: 0, to: doc.height });
+    }
+    for (const at of gridLines(settings, doc.height).major) {
+      targets.push({ axis: 'y', position: at, from: 0, to: doc.width });
+    }
+  }
+
+  return targets;
+}
+
 export function collectSnapTargets(doc: PixelDocument, movingLayerId: string): SnapTarget[] {
   const targets: SnapTarget[] = [];
   const documentRect: Rect = { x: 0, y: 0, width: doc.width, height: doc.height };

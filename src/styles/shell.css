@@ -108,3 +108,48 @@
   border-color: var(--pf-accent);
   outline: none;
 }
+
+/* Rulers inset the view canvas rather than covering it, so a document panned
+   into the top-left corner is not hidden underneath them. */
+.pf-stage.has-rulers .pf-view {
+  position: absolute;
+  top: var(--pf-ruler);
+  left: var(--pf-ruler);
+  width: calc(100% - var(--pf-ruler));
+  height: calc(100% - var(--pf-ruler));
+}
+
+.pf-ruler {
+  position: absolute;
+  z-index: 5;
+  background: var(--pf-bg-chrome);
+  touch-action: none;
+}
+
+.pf-ruler--h {
+  top: 0;
+  left: var(--pf-ruler);
+  right: 0;
+  height: var(--pf-ruler);
+  cursor: ns-resize;
+}
+
+.pf-ruler--v {
+  top: var(--pf-ruler);
+  left: 0;
+  bottom: 0;
+  width: var(--pf-ruler);
+  cursor: ew-resize;
+}
+
+.pf-ruler-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  width: var(--pf-ruler);
+  height: var(--pf-ruler);
+  background: var(--pf-bg-chrome);
+  border-right: 1px solid var(--pf-line);
+  border-bottom: 1px solid var(--pf-line);
+}

@@ -1,3 +1,4 @@
+import type { DocumentGuide } from './guides';
 import type { VectorPath } from './path';
 import type { SelectionMask } from './selection';
 import type { Layer } from './types';
@@ -19,6 +20,8 @@ export class PixelDocument {
    * behaves and keeps an experiment from cluttering the list.
    */
   paths: VectorPath[] = [];
+  /** Ruler guides, saved with the document. */
+  guides: DocumentGuide[] = [];
   activePathId: string | null = null;
   workPathId: string | null = null;
   /** Used for the export filename and the window title. */

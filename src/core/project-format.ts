@@ -2,6 +2,7 @@ import type { AdjustmentData } from './adjustments';
 import type { PixelDocument } from './document';
 import { createLayer } from './layer';
 import { SelectionMask } from './selection';
+import type { DocumentGuide } from './guides';
 import type { LayerStyles } from './layer-styles';
 import type { VectorPath } from './path';
 import type { ShapeData } from './shape-layer';
@@ -52,6 +53,7 @@ export interface StoredDocument {
   readonly paths?: readonly VectorPath[];
   readonly activePathId?: string | null;
   readonly workPathId?: string | null;
+  readonly guides?: readonly DocumentGuide[];
 }
 
 export interface SerialisedProject {
@@ -153,6 +155,7 @@ export async function serialiseProject(
       ...(doc.paths.length > 0
         ? { paths: doc.paths, activePathId: doc.activePathId, workPathId: doc.workPathId }
         : {}),
+      ...(doc.guides.length > 0 ? { guides: doc.guides } : {}),
       viewport: { ...options.viewport },
     },
     blobs,
@@ -238,6 +241,7 @@ export async function restoreProject(
   })) : [];
   doc.activePathId = stored.activePathId ?? null;
   doc.workPathId = stored.workPathId ?? null;
+  doc.guides = stored.guides ? stored.guides.map((guide) => ({ ...guide })) : [];
 
   doc.selection = null;
   const selectionBlob = stored.selectionKey ? blobs.get(stored.selectionKey) : undefined;

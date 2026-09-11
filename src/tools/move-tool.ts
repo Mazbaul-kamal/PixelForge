@@ -4,7 +4,8 @@ import { alignLayerToDocument, canEditLayer, cloneLayerAbove } from '../core/lay
 import type { AlignEdge } from '../core/layer-ops';
 import { captureLayerPixels, restoreLayerPixels } from '../core/snapshot';
 import type { PixelSnapshot } from '../core/snapshot';
-import { collectSnapTargets, computeSnap, layerRect } from '../core/snapping';
+import { collectSnapTargets, computeSnap, guideSnapTargets, layerRect } from '../core/snapping';
+import type { GuideSettings } from '../core/guides';
 import type { Guide } from '../core/snapping';
 import type { SelectionMask } from '../core/selection';
 import type { Layer, Point } from '../core/types';
@@ -71,7 +72,12 @@ function constrain(dx: number, dy: number): Point {
   return { x: Math.cos(angle) * length, y: Math.sin(angle) * length };
 }
 
-export function createMoveTool(): Tool {
+export interface MoveDeps {
+  /** Read live, so toggling guides or the grid takes effect immediately. */
+  readonly guideSettings: () => GuideSettings;
+}
+
+export function createMoveTool(deps: MoveDeps): Tool {
   let dragging = false;
   let startDoc: Point = { x: 0, y: 0 };
   let startLayer: Point = { x: 0, y: 0 };
@@ -231,10 +237,14 @@ export function createMoveTool(): Tool {
       let y = Math.round(startLayer.y + dy);
 
       // Ctrl suspends snapping, matching every other editor.
-      const snapEnabled = context.options.get<boolean>('snap') && !pointer.ctrlKey && !pointer.metaKey;
+      const snapEnabled = context.options.get<boolean>('snap')
+        && deps.guideSettings().snap && !pointer.ctrlKey && !pointer.metaKey;
       if (snapEnabled) {
         const rect = { ...layerRect(layer), x, y };
-        const targets = collectSnapTargets(context.doc, layer.id);
+        const targets = [
+          ...collectSnapTargets(context.doc, layer.id),
+          ...guideSnapTargets(context.doc, deps.guideSettings()),
+        ];
         const outcome = computeSnap(rect, targets, SNAP_THRESHOLD_PX / context.viewport.zoom);
         x = Math.round(x + outcome.dx);
         y = Math.round(y + outcome.dy);

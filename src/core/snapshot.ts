@@ -1,6 +1,7 @@
 import type { PixelDocument } from './document';
 import type { SelectionMask } from './selection';
 import type { AdjustmentData } from './adjustments';
+import type { DocumentGuide } from './guides';
 import type { LayerStyles } from './layer-styles';
 import type { VectorPath } from './path';
 import type { ShapeData } from './shape-layer';
@@ -64,6 +65,7 @@ export interface DocumentSnapshot {
   readonly paths: readonly VectorPath[];
   readonly activePathId: string | null;
   readonly workPathId: string | null;
+  readonly guides: readonly DocumentGuide[];
 }
 
 function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -141,6 +143,7 @@ export function captureDocument(doc: PixelDocument): DocumentSnapshot {
     paths: [...doc.paths],
     activePathId: doc.activePathId,
     workPathId: doc.workPathId,
+    guides: [...doc.guides],
   };
 }
 
@@ -159,6 +162,7 @@ export function restoreDocument(doc: PixelDocument, snapshot: DocumentSnapshot):
   doc.paths = [...snapshot.paths];
   doc.activePathId = snapshot.activePathId;
   doc.workPathId = snapshot.workPathId;
+  doc.guides = [...snapshot.guides];
 }
 
 function applyRecord(layer: Layer | undefined, record: LayerRecord): Layer {
@@ -237,6 +241,7 @@ export function documentSnapshotsEqual(a: DocumentSnapshot, b: DocumentSnapshot)
     a.activePathId !== b.activePathId ||
     a.workPathId !== b.workPathId ||
     a.paths.length !== b.paths.length ||
+    a.guides.length !== b.guides.length ||
     a.layers.length !== b.layers.length
   ) {
     return false;
@@ -244,6 +249,12 @@ export function documentSnapshotsEqual(a: DocumentSnapshot, b: DocumentSnapshot)
 
   for (let i = 0; i < a.paths.length; i++) {
     if (a.paths[i] !== b.paths[i]) return false;
+  }
+
+  for (let i = 0; i < a.guides.length; i++) {
+    const left = a.guides[i]!;
+    const right = b.guides[i]!;
+    if (left.axis !== right.axis || left.position !== right.position) return false;
   }
 
   for (let i = 0; i < a.layers.length; i++) {

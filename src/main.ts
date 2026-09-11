@@ -40,6 +40,12 @@ import { createCloneStampTool } from './tools/clone-stamp-tool';
 import { createDodgeBurnTool } from './tools/dodge-burn-tool';
 import { createSmudgeTool } from './tools/smudge-tool';
 import { createTransformTool } from './tools/transform-tool';
+import { defaultGuideSettings } from './core/guides';
+import { Rulers } from './view/rulers';
+import {
+  attachGuideDragging, attachGuideShortcuts, clearAllGuides, newGuideAt,
+} from './ui/guide-commands';
+import type { GuideDeps } from './ui/guide-commands';
 import { createPenTool } from './tools/pen-tool';
 import { createShapeTool } from './tools/shape-tool';
 import { createSpotHealingTool } from './tools/spot-healing-tool';
@@ -115,7 +121,9 @@ function boot(): void {
   const statusBar = new StatusBar(shell.statusBar, {
     onZoomEntered: (zoom) => viewport.setZoom(zoom),
   });
+  const guideSettings = defaultGuideSettings();
   const renderer = new ViewRenderer(shell.stage, doc, compositor, viewport);
+  renderer.setGuideSettings(guideSettings);
 
   viewport.onChange = () => {
     renderer.invalidate();
@@ -238,6 +246,45 @@ function boot(): void {
   attachViewportNavigation(renderer.canvas, viewport, {
     onPointerPosition: (point) => statusBar.setPointer(point),
   });
+  const rulers = new Rulers(shell.stage, {
+    doc,
+    viewport,
+    view: renderer.canvas,
+    settings: guideSettings,
+    onCreateGuide: (axis, position) => newGuideAt(guideDeps, axis, position),
+    onPreviewGuide: () => renderer.invalidate(),
+  });
+
+  // Toggling rulers changes the canvas box, so the renderer is re-measured.
+  const applyGuideSettings = (): void => {
+    rulers.setVisible(guideSettings.rulers);
+    renderer.setGuideSettings(guideSettings);
+    renderer.syncSize();
+    rulers.draw(true);
+    renderer.invalidate();
+  };
+
+  const guideDeps: GuideDeps = {
+    doc,
+    history,
+    viewport,
+    settings: guideSettings,
+    renderer,
+    rulers,
+    view: renderer.canvas,
+    refresh: () => {
+      rulers.draw(true);
+      renderer.invalidate();
+    },
+    notify: (message, detail) => notices.show(message, detail),
+  };
+
+  attachGuideDragging(guideDeps);
+  attachGuideShortcuts(guideDeps, applyGuideSettings);
+  renderer.afterDraw = () => rulers.draw();
+  new ResizeObserver(() => rulers.draw(true)).observe(shell.stage);
+  applyGuideSettings();
+
   attachViewShortcuts(viewport, doc);
 
 
@@ -294,7 +341,7 @@ function boot(): void {
     if (selectionOverlay.isAnimating) renderer.invalidate();
   });
 
-  toolManager.register(createMoveTool());
+  toolManager.register(createMoveTool({ guideSettings: () => guideSettings }));
   toolManager.register(createMarqueeTool('rectangle'));
   toolManager.register(createMarqueeTool('ellipse'));
   toolManager.register(createLassoTool());
@@ -787,6 +834,42 @@ function boot(): void {
         label: `${FILTER_NAMES[kind]}…`,
         run: () => openFilter(filterDeps, kind),
       })),
+    },
+    {
+      label: 'View',
+      items: [
+        {
+          label: 'Show Rulers',
+          shortcut: 'Ctrl+R',
+          run: () => { guideSettings.rulers = !guideSettings.rulers; applyGuideSettings(); },
+        },
+        {
+          label: 'Show Guides',
+          shortcut: 'Ctrl+;',
+          run: () => { guideSettings.guides = !guideSettings.guides; applyGuideSettings(); },
+        },
+        {
+          label: 'Show Grid',
+          shortcut: "Ctrl+'",
+          run: () => { guideSettings.grid = !guideSettings.grid; applyGuideSettings(); },
+        },
+        {
+          label: 'Snap',
+          shortcut: 'Ctrl+Shift+;',
+          run: () => { guideSettings.snap = !guideSettings.snap; applyGuideSettings(); },
+        },
+        {
+          label: 'Guide Down the Middle',
+          run: () => {
+            newGuideAt(guideDeps, 'x', doc.width / 2);
+            newGuideAt(guideDeps, 'y', doc.height / 2);
+          },
+        },
+        {
+          label: 'Clear Guides',
+          run: () => clearAllGuides(guideDeps),
+        },
+      ],
     },
     {
       label: 'Select',

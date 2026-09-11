@@ -2,6 +2,8 @@ import type { Compositor } from '../core/compositor';
 import type { PixelDocument } from '../core/document';
 import type { Viewport } from '../core/viewport';
 import { CHECKER_CELL_CSS_PX, createCheckerPattern } from './checkerboard';
+import { gridLines } from '../core/guides';
+import type { GuideSettings } from '../core/guides';
 
 const MAX_DPR = 2;
 
@@ -9,6 +11,11 @@ const MAX_DPR = 2;
  * Owns the on-screen canvas. One requestAnimationFrame loop draws it and
  * nothing else in the app is allowed to touch this canvas.
  */
+const GRID_MAJOR = 'rgba(120, 160, 220, 0.45)';
+const GRID_MINOR = 'rgba(120, 160, 220, 0.20)';
+const GUIDE_COLOUR = 'rgba(0, 190, 255, 0.9)';
+const GUIDE_ACTIVE = 'rgba(255, 90, 60, 0.95)';
+
 export class ViewRenderer {
   readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
@@ -24,6 +31,20 @@ export class ViewRenderer {
   private needsRedraw = true;
   private frame = 0;
   private overlay: ((ctx: CanvasRenderingContext2D) => void) | null = null;
+  /**
+   * Ruler guides and the grid are drawn here rather than through a tool
+   * overlay, because the rAF loop owns this canvas and they must show
+   * whichever tool is active.
+   */
+  private guideSettings: GuideSettings | null = null;
+  /** Index of the guide being dragged, drawn highlighted. */
+  highlightedGuide = -1;
+  /**
+   * Run after each frame that actually drew. The rulers hang off this rather
+   * than off a viewport subscription, because they need to follow pan and zoom
+   * and the render loop already knows exactly when those changed.
+   */
+  afterDraw: (() => void) | null = null;
 
   private lastTickAt = 0;
   /**
@@ -72,6 +93,11 @@ export class ViewRenderer {
    * Registers the painter drawn last, on top of everything. Tools reach the
    * screen only through here; nothing else may touch the view canvas.
    */
+  setGuideSettings(settings: GuideSettings | null): void {
+    this.guideSettings = settings;
+    this.needsRedraw = true;
+  }
+
   setOverlayPainter(painter: ((ctx: CanvasRenderingContext2D) => void) | null): void {
     this.overlay = painter;
     this.needsRedraw = true;
@@ -99,8 +125,10 @@ export class ViewRenderer {
 
   /** Reads sizing from the container and keeps the backing store at DPR. */
   syncSize(): void {
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    // The canvas box, not the stage: with rulers showing, the canvas is inset
+    // and measuring the stage would size it too large by the ruler thickness.
+    const width = this.canvas.clientWidth || this.container.clientWidth;
+    const height = this.canvas.clientHeight || this.container.clientHeight;
     if (width <= 0 || height <= 0) return;
 
     this.dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
@@ -191,7 +219,86 @@ export class ViewRenderer {
     ctx.strokeStyle = this.docBorder;
     ctx.strokeRect(left, top, right - left, bottom - top);
 
+    this.drawGuides();
     this.drawOverlay();
+    this.afterDraw?.();
+  }
+
+  /** The grid first, then the guides over it, both clipped to the document. */
+  private drawGuides(): void {
+    const settings = this.guideSettings;
+    if (!settings || (!settings.grid && !settings.guides)) return;
+
+    const { ctx, doc, viewport } = this;
+    const dpr = this.dpr;
+    const originX = viewport.panX * dpr;
+    const originY = viewport.panY * dpr;
+    const scale = viewport.zoom * dpr;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(originX, originY, doc.width * scale, doc.height * scale);
+    ctx.clip();
+
+    // Half-pixel offsets keep a 1px line on the device pixel grid.
+    const vertical = (at: number): number => Math.round(originX + at * scale) + 0.5;
+    const horizontal = (at: number): number => Math.round(originY + at * scale) + 0.5;
+    const bottom = originY + doc.height * scale;
+    const right = originX + doc.width * scale;
+
+    if (settings.grid) {
+      const columns = gridLines(settings, doc.width);
+      const rows = gridLines(settings, doc.height);
+
+      for (const [lines, colour] of [
+        [columns.minor, GRID_MINOR], [columns.major, GRID_MAJOR],
+      ] as const) {
+        ctx.strokeStyle = colour;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const at of lines) {
+          const x = vertical(at);
+          ctx.moveTo(x, originY);
+          ctx.lineTo(x, bottom);
+        }
+        ctx.stroke();
+      }
+
+      for (const [lines, colour] of [
+        [rows.minor, GRID_MINOR], [rows.major, GRID_MAJOR],
+      ] as const) {
+        ctx.strokeStyle = colour;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const at of lines) {
+          const y = horizontal(at);
+          ctx.moveTo(originX, y);
+          ctx.lineTo(right, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    if (settings.guides) {
+      for (let i = 0; i < doc.guides.length; i += 1) {
+        const guide = doc.guides[i]!;
+        ctx.strokeStyle = i === this.highlightedGuide ? GUIDE_ACTIVE : GUIDE_COLOUR;
+        ctx.lineWidth = i === this.highlightedGuide ? 2 : 1;
+        ctx.beginPath();
+        if (guide.axis === 'x') {
+          const x = vertical(guide.position);
+          ctx.moveTo(x, originY);
+          ctx.lineTo(x, bottom);
+        } else {
+          const y = horizontal(guide.position);
+          ctx.moveTo(originX, y);
+          ctx.lineTo(right, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
   }
 
   /** Tool overlays run last, in CSS pixel space so 1px strokes stay 1px. */
