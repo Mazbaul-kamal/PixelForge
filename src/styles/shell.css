@@ -35,6 +35,12 @@
 
 .pf-panels {
   grid-area: panels;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Five panels no longer fit a short window, so the column scrolls as a
+     whole rather than each panel clipping its own controls. */
+  overflow-y: auto;
   background: var(--pf-bg-panel);
   border-left: 1px solid var(--pf-line);
 }

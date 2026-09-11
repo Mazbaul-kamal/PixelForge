@@ -3,6 +3,7 @@ import type { PixelDocument } from './document';
 import { createLayer } from './layer';
 import { SelectionMask } from './selection';
 import type { DocumentGuide } from './guides';
+import { createChannel } from './channels';
 import type { LayerStyles } from './layer-styles';
 import type { VectorPath } from './path';
 import type { ShapeData } from './shape-layer';
@@ -54,6 +55,17 @@ export interface StoredDocument {
   readonly activePathId?: string | null;
   readonly workPathId?: string | null;
   readonly guides?: readonly DocumentGuide[];
+  readonly channels?: readonly StoredChannel[];
+}
+
+/** A stored selection. The coverage lives in a PNG beside the document. */
+export interface StoredChannel {
+  readonly id: string;
+  readonly name: string;
+  readonly key: string;
+  readonly colour: string;
+  readonly opacity: number;
+  readonly visible: boolean;
 }
 
 export interface SerialisedProject {
@@ -133,6 +145,20 @@ export async function serialiseProject(
     });
   }
 
+  const channels: StoredChannel[] = [];
+  for (const channel of doc.channels) {
+    const key = `channel-${channel.id}.png`;
+    // Channel masks are document-sized, so they honour reuse like a layer.
+    if (!options.reuse?.has(key)) {
+      const blob = await toPngBlob(channel.mask.canvas);
+      if (blob) blobs.set(key, blob);
+    }
+    channels.push({
+      id: channel.id, name: channel.name, key,
+      colour: channel.colour, opacity: channel.opacity, visible: channel.visible,
+    });
+  }
+
   let selectionKey: string | undefined;
   if (doc.selection) {
     selectionKey = SELECTION_KEY;
@@ -156,6 +182,7 @@ export async function serialiseProject(
         ? { paths: doc.paths, activePathId: doc.activePathId, workPathId: doc.workPathId }
         : {}),
       ...(doc.guides.length > 0 ? { guides: doc.guides } : {}),
+      ...(channels.length > 0 ? { channels } : {}),
       viewport: { ...options.viewport },
     },
     blobs,
@@ -255,6 +282,24 @@ export async function restoreProject(
     }
   }
 
+  doc.channels = [];
+  for (const record of stored.channels ?? []) {
+    const blob = blobs.get(record.key);
+    if (!blob) continue;
+    const canvas = await blobToCanvas(blob, stored.width, stored.height);
+    const data = canvas.getContext('2d')?.getImageData(0, 0, stored.width, stored.height);
+    if (!data) continue;
+    const coverage = new Uint8ClampedArray(stored.width * stored.height);
+    for (let i = 0, p = 3; i < coverage.length; i++, p += 4) coverage[i] = data.data[p]!;
+    doc.channels.push({
+      ...createChannel(record.name, new SelectionMask(stored.width, stored.height, coverage)),
+      id: record.id,
+      colour: record.colour,
+      opacity: record.opacity,
+      visible: record.visible,
+    });
+  }
+
   doc.pristine = false;
   return stored.viewport;
 }
@@ -267,5 +312,6 @@ export function keysOf(stored: StoredDocument): Set<string> {
     if (layer.maskKey) keys.add(layer.maskKey);
   }
   if (stored.selectionKey) keys.add(stored.selectionKey);
+  for (const channel of stored.channels ?? []) keys.add(channel.key);
   return keys;
 }

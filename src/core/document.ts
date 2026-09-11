@@ -1,3 +1,4 @@
+import type { AlphaChannel, ChannelView } from './channels';
 import type { DocumentGuide } from './guides';
 import type { VectorPath } from './path';
 import type { SelectionMask } from './selection';
@@ -22,6 +23,10 @@ export class PixelDocument {
   paths: VectorPath[] = [];
   /** Ruler guides, saved with the document. */
   guides: DocumentGuide[] = [];
+  /** Stored selections. */
+  channels: AlphaChannel[] = [];
+  /** Which colour channel the view isolates. Not saved: it is a view state. */
+  channelView: ChannelView = 'rgb';
   activePathId: string | null = null;
   workPathId: string | null = null;
   /** Used for the export filename and the window title. */

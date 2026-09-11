@@ -61,6 +61,18 @@ export class HistoryPanel {
       row.classList.toggle('is-undone', index > current);
       row.setAttribute('aria-selected', index === current ? 'true' : 'false');
     });
-    this.rows[current]?.scrollIntoView({ block: 'nearest' });
+    // Scroll this list only. scrollIntoView walks every scrollable ancestor,
+    // which now includes the panel column, so a new entry would drag the
+    // Layers panel off the top of the sidebar.
+    const row = this.rows[current];
+    const box = this.list.parentElement;
+    if (row && box) {
+      const top = row.offsetTop;
+      const bottom = top + row.offsetHeight;
+      if (top < box.scrollTop) box.scrollTop = top;
+      else if (bottom > box.scrollTop + box.clientHeight) {
+        box.scrollTop = bottom - box.clientHeight;
+      }
+    }
   }
 }

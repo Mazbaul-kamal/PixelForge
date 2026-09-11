@@ -88,6 +88,7 @@ import { attachViewShortcuts } from './ui/view-shortcuts';
 import { UnsavedGuard } from './ui/unsaved-guard';
 import { attachLayerShortcuts } from './ui/layer-shortcuts';
 import { HistoryPanel } from './ui/panels/history-panel';
+import { ChannelsPanel } from './ui/panels/channels-panel';
 import { PathsPanel } from './ui/panels/paths-panel';
 import { InfoPanel } from './ui/panels/info-panel';
 import { LayersPanel } from './ui/panels/layers-panel';
@@ -163,7 +164,19 @@ function boot(): void {
     colour: () => colours.foreground,
     strokeWidth: () => 2,
   });
-  shell.panels.append(layersPanel.root, pathsPanel.root, infoPanel.root, historyPanel.root);
+  const channelsPanel = new ChannelsPanel({
+    doc,
+    history,
+    changed: () => {
+      compositor.markDirty();
+      documentChanged();
+    },
+    notify: (message, detail) => notices.show(message, detail),
+  });
+
+  shell.panels.append(
+    layersPanel.root, channelsPanel.root, pathsPanel.root, infoPanel.root, historyPanel.root,
+  );
 
   layersPanel.onMaskViewChanged = (layerId) => {
     compositor.setMaskPreview(layerId);

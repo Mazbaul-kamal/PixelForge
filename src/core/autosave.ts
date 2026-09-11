@@ -143,10 +143,24 @@ export class Autosave {
     if (this.deps.doc.selection !== null && this.deps.doc.selection === this.lastSelection) {
       unchanged.add(SELECTION_KEY);
     }
+
+    // Channel masks are immutable, so an unchanged reference means unchanged
+    // pixels — without this every autosave would re-encode every channel.
+    const previous = new Map((this.lastRecord.document.channels ?? []).map((c) => [c.id, c]));
+    for (const channel of this.deps.doc.channels) {
+      const record = previous.get(channel.id);
+      if (record && this.lastChannels.get(channel.id) === channel.mask) unchanged.add(record.key);
+    }
     return unchanged;
   }
 
+  /** The mask each channel had at the last autosave, compared by identity. */
+  private lastChannels = new Map<string, unknown>();
+
   private rememberSignatures(record: ProjectRecord): void {
+    this.lastChannels = new Map(
+      this.deps.doc.channels.map((channel) => [channel.id, channel.mask]),
+    );
     const next = new Map<string, string>();
     const stored = new Map(record.document.layers.map((l) => [l.id, l]));
 

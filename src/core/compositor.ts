@@ -1,5 +1,6 @@
 import { WebGLCompositor } from '../view/webgl-compositor';
 import { createAdjustment } from './adjustments';
+import { anyChannelVisible } from './channels';
 import { hasActiveStyles, renderLayerStyles } from './layer-styles';
 import type { StyledLayer } from './layer-styles';
 import type { PixelDocument } from './document';
@@ -421,7 +422,8 @@ export class Compositor {
 
     if (this.glWanted) {
       const gl = this.ensureGl();
-      if (gl && gl.canHandle(doc, this.maskPreviewLayerId)
+      const channelWork = doc.channelView !== 'rgb' || anyChannelVisible(doc);
+      if (!channelWork && gl && gl.canHandle(doc, this.maskPreviewLayerId)
         && gl.compose(doc, this.live, this.layerRevision)) {
         this.activePath = 'webgl';
         this.dirty = false;
@@ -469,6 +471,9 @@ export class Compositor {
 
     this.renderSiblings(ctx, this.canvas.width, this.canvas.height, childrenOf(doc.layers, undefined));
 
+    this.applyChannelView(ctx, region);
+    this.drawChannelOverlays(ctx);
+
     if (partial) ctx.restore();
 
     ctx.globalAlpha = 1;
@@ -476,6 +481,55 @@ export class Compositor {
     this.dirty = false;
     this.tiles.clean();
     this.lastComposeMs = performance.now() - started;
+  }
+
+  /**
+   * Isolates one colour channel, shown as grey the way Photoshop does rather
+   * than as the channel tinted in its own colour — grey is what makes the
+   * tonal range readable, which is the point of looking at a channel at all.
+   */
+  private applyChannelView(ctx: CanvasRenderingContext2D, region: Rect): void {
+    const view = this.doc.channelView;
+    if (view === 'rgb') return;
+    if (region.width <= 0 || region.height <= 0) return;
+
+    const image = ctx.getImageData(region.x, region.y, region.width, region.height);
+    const offset = view === 'red' ? 0 : view === 'green' ? 1 : 2;
+    const data = image.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const value = data[i + offset]!;
+      data[i] = value;
+      data[i + 1] = value;
+      data[i + 2] = value;
+    }
+    ctx.putImageData(image, region.x, region.y);
+  }
+
+  /** Visible alpha channels tint the composite, like a quick mask. */
+  private drawChannelOverlays(ctx: CanvasRenderingContext2D): void {
+    if (!anyChannelVisible(this.doc)) return;
+
+    for (const channel of this.doc.channels) {
+      if (!channel.visible) continue;
+      const tint = this.ensureScratch(this.canvas.width, this.canvas.height);
+      const tintCtx = tint.getContext('2d');
+      if (!tintCtx) continue;
+
+      tintCtx.setTransform(1, 0, 0, 1, 0, 0);
+      tintCtx.globalCompositeOperation = 'source-over';
+      tintCtx.globalAlpha = 1;
+      tintCtx.clearRect(0, 0, tint.width, tint.height);
+      tintCtx.fillStyle = channel.colour;
+      tintCtx.fillRect(0, 0, tint.width, tint.height);
+      // The mask's coverage becomes the tint's alpha.
+      tintCtx.globalCompositeOperation = 'destination-in';
+      tintCtx.drawImage(channel.mask.canvas, 0, 0);
+
+      ctx.globalAlpha = Math.min(1, Math.max(0, channel.opacity));
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(tint, 0, 0);
+      ctx.globalAlpha = 1;
+    }
   }
 
   /** Draws one level of the layer tree, bottom first. */

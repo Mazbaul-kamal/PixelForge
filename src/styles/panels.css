@@ -5,16 +5,17 @@
   overflow: hidden;
 }
 
+/* Panels keep their natural height and the column scrolls past them, rather
+   than every panel shrinking and growing its own scrollbar. */
 .pf-panel {
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  flex: 0 0 auto;
   border-bottom: 1px solid var(--pf-line);
 }
 
 .pf-panel--history {
-  flex: 1;
-  min-height: 120px;
+  min-height: 140px;
 }
 
 .pf-panel-title {
@@ -178,7 +179,7 @@
 }
 
 .pf-path-list {
-  max-height: 190px;
+  max-height: 140px;
   overflow-y: auto;
 }
 
@@ -232,6 +233,92 @@
 }
 
 .pf-path-actions {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  border-top: 1px solid var(--pf-line);
+}
+
+/* The four colour channels are a fixed set, so this never needs to scroll. */
+.pf-channel-list {
+  flex: 0 0 auto;
+}
+
+.pf-channel-list--alpha {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.pf-channel-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--pf-line);
+}
+
+.pf-channel-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 9px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.pf-channel-row:hover { background: rgba(255, 255, 255, 0.04); }
+
+.pf-channel-row.is-active {
+  background: rgba(76, 159, 254, 0.18);
+  border-left-color: var(--pf-accent);
+}
+
+.pf-channel-eye {
+  width: 15px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pf-text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pf-channel-swatch {
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 2px;
+}
+
+.pf-channel-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-channel-hint {
+  color: var(--pf-text-dim);
+  font-size: 10px;
+}
+
+.pf-channel-empty {
+  margin: 6px 9px 8px;
+  color: var(--pf-text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.pf-channel-rename {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid var(--pf-accent);
+  border-radius: 2px;
+  background: var(--pf-bg-sunken);
+  color: var(--pf-text);
+  font: inherit;
+}
+
+.pf-channel-actions {
   display: flex;
   gap: 2px;
   padding: 4px 6px;
